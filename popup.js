@@ -1,196 +1,38 @@
-const toggleSwitch = document.getElementById('toggleFocus');
-const personaGrid = document.getElementById('personaGrid');
-const status = document.getElementById('status');
-const likedCount = document.getElementById('likedCount');
-const hiddenCount = document.getElementById('hiddenCount');
-const dailyCount = document.getElementById('dailyCount');
-const intensitySlider = document.getElementById('intensitySlider');
-const intensityValue = document.getElementById('intensityValue');
-const settingsBtn = document.getElementById('settingsBtn');
-const exportBtn = document.getElementById('exportBtn');
+// ... (Keep existing variable declarations) ...
+const turboBtn = document.getElementById('turboBtn');
 
-const personas = [
-  {
-    id: 'polymath',
-    name: 'The Polymath',
-    description: 'Renaissance thinking across disciplines'
-  },
-  {
-    id: 'engineer',
-    name: 'The Engineer',
-    description: 'Technology, systems & building'
-  },
-  {
-    id: 'strategist',
-    name: 'The Strategist',
-    description: 'Business, finance & planning'
-  },
-  {
-    id: 'stoic',
-    name: 'The Stoic',
-    description: 'Philosophy & mental resilience'
-  },
-  {
-    id: 'scientist',
-    name: 'The Scientist',
-    description: 'Research, discovery & inquiry'
-  },
-  {
-    id: 'artist',
-    name: 'The Artist',
-    description: 'Creativity, design & expression'
-  },
-  {
-    id: 'warrior',
-    name: 'The Warrior',
-    description: 'Discipline, strength & performance'
-  },
-  {
-    id: 'healer',
-    name: 'The Healer',
-    description: 'Health, longevity & wellness'
-  },
-  {
-    id: 'explorer',
-    name: 'The Explorer',
-    description: 'Discovery, adventure & frontiers'
-  },
-  {
-    id: 'sage',
-    name: 'The Sage',
-    description: 'Wisdom, meaning & understanding'
-  }
-];
+// ... (Keep existing storage/listeners) ...
 
-chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats'], (result) => {
-  const focusEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
-  const selectedPersona = result.selectedPersona || 'polymath';
-  const intensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
-
-  toggleSwitch.checked = focusEnabled;
-  intensitySlider.value = intensity;
-  intensityValue.textContent = intensity + '%';
-  updateStatus(focusEnabled);
-  renderPersonas(selectedPersona);
-  loadStats();
-});
-
-toggleSwitch.addEventListener('change', (e) => {
-  const enabled = e.target.checked;
-  chrome.storage.sync.set({ focusEnabled: enabled }, () => {
-    updateStatus(enabled);
-    reloadSocialMediaTabs();
-  });
-});
-
-function renderPersonas(selected) {
-  personaGrid.innerHTML = '';
-
-  personas.forEach(persona => {
-    const option = document.createElement('div');
-    option.className = `persona-option ${persona.id === selected ? 'active' : ''}`;
-    option.innerHTML = `
-      <div class="persona-name">${persona.name}</div>
-      <div class="persona-desc">${persona.description}</div>
-    `;
-
-    option.addEventListener('click', () => {
-      chrome.storage.sync.set({ selectedPersona: persona.id }, () => {
-        renderPersonas(persona.id);
-        reloadSocialMediaTabs();
-      });
-    });
-
-    personaGrid.appendChild(option);
-  });
-}
-
-function updateStatus(enabled) {
-  status.textContent = enabled ? 'Active - Training your algorithm' : 'Disabled - No training in progress';
-  status.style.background = enabled ? '#1a3a1a' : '#272727';
-  status.style.color = enabled ? '#4ade80' : '#aaa';
-}
-
-let statsInterval = null;
-
-function loadStats() {
-  // Load session stats from local storage
-  chrome.storage.local.get(['sessionStats'], (result) => {
-    if (result.sessionStats) {
-      likedCount.textContent = result.sessionStats.liked || 0;
-      hiddenCount.textContent = result.sessionStats.hidden || 0;
+// TURBO TRAIN LOGIC
+turboBtn.addEventListener('click', () => {
+  chrome.storage.sync.get(['selectedPersona'], (result) => {
+    const persona = result.selectedPersona || 'polymath';
+    
+    // Access rules from the loaded classifier.js
+    if (!CLASSIFIER_RULES || !CLASSIFIER_RULES[persona]) {
+      status.textContent = "Error loading persona rules";
+      return;
     }
-  });
 
-  // Load daily stats
-  chrome.storage.sync.get(['dailyStats'], (result) => {
-    if (result.dailyStats) {
-      dailyCount.textContent = result.dailyStats.count || 0;
-    }
-  });
-}
+    const keywords = CLASSIFIER_RULES[persona].educational;
+    const shuffled = keywords.sort(() => 0.5 - Math.random());
+    const targets = shuffled.slice(0, 5); // Pick 5 random topics
 
-// Auto-refresh stats every 5 seconds (run once)
-if (!statsInterval) {
-  statsInterval = setInterval(loadStats, 5000);
-}
-
-function reloadSocialMediaTabs() {
-  const platforms = [
-    '*://*.youtube.com/*',
-    '*://*.facebook.com/*',
-    '*://*.instagram.com/*',
-    '*://*.twitter.com/*',
-    '*://*.x.com/*',
-    '*://*.tiktok.com/*'
-  ];
-
-  platforms.forEach(url => {
-    chrome.tabs.query({ url }, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.reload(tab.id);
-      });
+    status.textContent = `🚀 Launching training for: ${targets[0]}...`;
+    
+    // Open tabs
+    targets.forEach((keyword, index) => {
+      setTimeout(() => {
+        const query = encodeURIComponent(keyword);
+        chrome.tabs.create({
+          url: `https://www.youtube.com/results?search_query=${query}&sp=EgIQAQ%253D%253D`, // sp param filters for video only to avoid playlists
+          active: false // Open in background
+        });
+      }, index * 500); // Stagger opens
     });
   });
-}
-
-// Intensity slider handler
-intensitySlider.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
-  intensityValue.textContent = value + '%';
-  chrome.storage.sync.set({ trainingIntensity: value }, () => {
-    reloadSocialMediaTabs();
-  });
 });
 
-// Settings button handler
-settingsBtn.addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
-});
-
-// Export button handler
-exportBtn.addEventListener('click', () => {
-  chrome.storage.sync.get(['selectedPersona', 'customPersonas'], (result) => {
-    const personaId = result.selectedPersona || 'polymath';
-
-    // Check if it's a custom persona
-    if (result.customPersonas && result.customPersonas[personaId]) {
-      const persona = result.customPersonas[personaId];
-      downloadJSON(persona, `${personaId}-persona.json`);
-    } else {
-      // Export default persona
-      const persona = personas.find(p => p.id === personaId);
-      alert('Default personas cannot be exported. Create a custom persona first!');
-    }
-  });
-});
-
-function downloadJSON(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// ... (Keep rest of existing file: renderPersonas, toggle listeners, etc.) ...
+// Ensure you keep the renderPersonas function and initialization calls!
+// Copy the bottom half of your previous popup.js here.
