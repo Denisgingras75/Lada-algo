@@ -1,0 +1,115 @@
+#focus-feed-container {
+  width: 100%;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #0f0f0f;
+  min-height: 100vh;
+}
+
+.focus-feed-header {
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  border-left: 4px solid #3ea6ff;
+}
+
+.focus-feed-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f1f1f1;
+  margin: 0 0 8px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.focus-feed-header p {
+  font-size: 14px;
+  color: #aaa;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.focus-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.focus-feed-card {
+  background: #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  border: 1px solid #2a2a2a;
+}
+
+.focus-feed-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: #3ea6ff;
+}
+
+.focus-feed-thumbnail {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #0f0f0f;
+  overflow: hidden;
+}
+
+.focus-feed-thumbnail img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.focus-feed-card:hover .focus-feed-thumbnail img {
+  transform: scale(1.05);
+}
+
+.focus-feed-info {
+  padding: 16px;
+}
+
+.focus-feed-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f1f1;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.focus-feed-channel {
+  font-size: 12px;
+  color: #aaa;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .focus-feed-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #focus-feed-container {
+    padding: 16px;
+  }
+
+  .focus-feed-header {
+    padding: 16px;
+  }
+}
