@@ -1,0 +1,381 @@
+/* SHARED STYLES */
+.focus-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.focus-header {
+  margin-bottom: 24px;
+}
+
+.focus-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.focus-header p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* YOUTUBE STYLES */
+.focus-youtube {
+  width: 100%;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #0f0f0f;
+  min-height: 100vh;
+}
+
+.focus-youtube .focus-header {
+  padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  border-left: 4px solid #3ea6ff;
+}
+
+.focus-youtube .focus-header h2 {
+  color: #f1f1f1;
+}
+
+.focus-youtube .focus-header p {
+  color: #aaa;
+}
+
+.focus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.focus-card {
+  background: #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  border: 1px solid #2a2a2a;
+}
+
+.focus-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: #3ea6ff;
+}
+
+.focus-thumbnail {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #0f0f0f;
+  overflow: hidden;
+}
+
+.focus-thumbnail img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.focus-card:hover .focus-thumbnail img {
+  transform: scale(1.05);
+}
+
+.focus-info {
+  padding: 16px;
+}
+
+.focus-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f1f1;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.focus-channel {
+  font-size: 12px;
+  color: #aaa;
+  margin: 0;
+}
+
+/* TWITTER/X STYLES */
+.focus-twitter {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e1e8ed;
+}
+
+.focus-twitter .focus-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.focus-twitter .focus-header h2 {
+  color: #14171a;
+  font-size: 20px;
+}
+
+.focus-twitter .focus-header p {
+  color: #657786;
+  font-size: 13px;
+}
+
+.focus-briefing {
+  margin-top: 16px;
+}
+
+.focus-headline {
+  display: block;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #f7f9fa;
+  border-radius: 12px;
+  border-left: 3px solid #1da1f2;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.focus-headline:hover {
+  background: #e8f5fe;
+  transform: translateX(4px);
+}
+
+.focus-headline h3 {
+  color: #14171a;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.focus-source {
+  color: #657786;
+  font-size: 13px;
+}
+
+/* FACEBOOK STYLES */
+.focus-facebook {
+  max-width: 680px;
+  margin: 20px auto;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.focus-dashboard {
+  padding: 20px;
+}
+
+.focus-dashboard h2 {
+  color: #1c1e21;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.focus-date {
+  color: #65676b;
+  font-size: 13px;
+  margin: 0 0 20px 0;
+}
+
+.focus-headlines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.focus-headline-card {
+  display: block;
+  padding: 16px;
+  background: #f0f2f5;
+  border-radius: 8px;
+  border-left: 4px solid #1877f2;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.focus-headline-card:hover {
+  background: #e4e6eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.focus-headline-card h3 {
+  color: #1c1e21;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.focus-headline-card .focus-source {
+  color: #65676b;
+  font-size: 12px;
+}
+
+/* INSTAGRAM STYLES */
+.focus-instagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+}
+
+.focus-quote-card {
+  max-width: 500px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.focus-quote-card h2 {
+  color: #262626;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px 0;
+}
+
+.focus-quote {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #262626;
+  font-style: italic;
+  margin: 0 0 24px 0;
+  padding: 0;
+  border: none;
+}
+
+.focus-persona-label {
+  color: #8e8e8e;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* TIKTOK STYLES */
+.focus-tiktok {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-tiktok-block {
+  text-align: center;
+  padding: 48px;
+  max-width: 600px;
+}
+
+.focus-tiktok-block h1 {
+  color: #ffffff;
+  font-size: 48px;
+  font-weight: 900;
+  margin: 0 0 24px 0;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.focus-tiktok-block p {
+  color: #cccccc;
+  font-size: 18px;
+  margin: 0 0 32px 0;
+  line-height: 1.6;
+}
+
+.focus-tiktok-link {
+  display: inline-block;
+  padding: 16px 32px;
+  background: #ffffff;
+  color: #000000;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.focus-tiktok-link:hover {
+  background: #f0f0f0;
+  transform: scale(1.05);
+}
+
+/* UNIVERSAL AD BLOCKER STYLES */
+.focus-fact-card {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  margin: 12px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.focus-fact-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.focus-fact-content {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-youtube {
+    padding: 16px;
+  }
+
+  .focus-youtube .focus-header {
+    padding: 16px;
+  }
+
+  .focus-twitter,
+  .focus-facebook {
+    margin: 12px;
+  }
+
+  .focus-quote-card {
+    padding: 32px 24px;
+  }
+
+  .focus-tiktok-block h1 {
+    font-size: 32px;
+  }
+}
