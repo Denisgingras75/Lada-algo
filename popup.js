@@ -104,6 +104,8 @@ function updateStatus(enabled) {
   status.style.color = enabled ? '#4ade80' : '#aaa';
 }
 
+let statsInterval = null;
+
 function loadStats() {
   // Load session stats from local storage
   chrome.storage.local.get(['sessionStats'], (result) => {
@@ -119,9 +121,11 @@ function loadStats() {
       dailyCount.textContent = result.dailyStats.count || 0;
     }
   });
+}
 
-  // Auto-refresh stats every 5 seconds
-  setInterval(loadStats, 5000);
+// Auto-refresh stats every 5 seconds (run once)
+if (!statsInterval) {
+  statsInterval = setInterval(loadStats, 5000);
 }
 
 function reloadSocialMediaTabs() {

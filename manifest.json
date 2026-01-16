@@ -29,7 +29,7 @@
         "*://*.x.com/*",
         "*://*.tiktok.com/*"
       ],
-      "js": ["classifier.js", "content.js"],
+      "js": ["content.js"],
       "run_at": "document_end"
     }
   ]

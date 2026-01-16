@@ -20,6 +20,7 @@
   let actionQueue = [];
   let lastActionTime = 0;
   let dailyActionCount = 0;
+  let actionProcessorInterval = null;
 
   // Initialize
   chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'dailyStats'], (result) => {
@@ -52,17 +53,27 @@
   function initClassifier() {
     // Load classifier rules inline since we can't import in content script
     const rules = getClassifierRules();
+    const personaRules = rules[selectedPersona] || rules.polymath;
+
+    // Pre-normalize keywords for performance
+    const normalizedRules = {
+      educational: personaRules.educational.map(k => k.toLowerCase()),
+      junk: personaRules.junk.map(k => k.toLowerCase())
+    };
+
     classifier = {
-      rules: rules[selectedPersona] || rules.polymath,
+      rules: normalizedRules,
       classify: function(text) {
         if (!text) return 'neutral';
         const normalizedText = text.toLowerCase();
 
-        const junkMatches = this.rules.junk.filter(k => normalizedText.includes(k.toLowerCase()));
-        if (junkMatches.length > 0) return 'junk';
+        // Check junk first (higher priority)
+        const hasJunk = this.rules.junk.some(k => normalizedText.includes(k));
+        if (hasJunk) return 'junk';
 
-        const eduMatches = this.rules.educational.filter(k => normalizedText.includes(k.toLowerCase()));
-        if (eduMatches.length >= 1) return 'educational';
+        // Check educational
+        const hasEducational = this.rules.educational.some(k => normalizedText.includes(k));
+        if (hasEducational) return 'educational';
 
         return 'neutral';
       }
@@ -338,7 +349,12 @@
   }
 
   function startActionProcessor() {
-    setInterval(() => {
+    // Clear existing interval to prevent multiple processors
+    if (actionProcessorInterval) {
+      clearInterval(actionProcessorInterval);
+    }
+
+    actionProcessorInterval = setInterval(() => {
       if (actionQueue.length === 0) return;
       if (!trainingEnabled) return;
 
@@ -397,9 +413,16 @@
   }
 
   // OBSERVER
+  let observerTimeout = null;
+
   function startObserver() {
     observer = new MutationObserver(() => {
-      setTimeout(() => {
+      // Debounce: clear previous timeout and create new one
+      if (observerTimeout) {
+        clearTimeout(observerTimeout);
+      }
+
+      observerTimeout = setTimeout(() => {
         if (!trainingEnabled) return;
 
         if (hostname.includes('youtube.com')) {
@@ -410,6 +433,11 @@
           handleFacebook();
         } else if (hostname.includes('instagram.com')) {
           handleInstagram();
+        }
+
+        // Limit processedElements Set size to prevent memory bloat
+        if (processedElements.size > 500) {
+          processedElements.clear();
         }
       }, 1000);
     });
