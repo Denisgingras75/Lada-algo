@@ -213,38 +213,104 @@
   }
 
   function executeYouTubeLike(videoElement) {
-    // Open video in background, like it, close tab
     const titleElement = videoElement.querySelector('#video-title');
     if (!titleElement) return false;
 
     const videoUrl = titleElement.getAttribute('href');
     if (!videoUrl) return false;
 
-    console.log(`[Focus Feed] ✓ Liking educational video: ${titleElement.textContent.trim()}`);
+    const title = titleElement.textContent.trim();
+    console.log(`[Focus Feed] ✓ Marking educational: "${title}"`);
 
-    // Simulate like by clicking the like button if video is visible
-    // In practice, we'd open in background tab and like there
-    // For now, just mark it as processed
+    // Strategy: Add visual indicator that this was classified as educational
+    // YouTube doesn't expose like buttons on feed thumbnails, so we can't directly like
+    // The user will naturally click and watch these videos, which trains the algorithm
+
+    // Add a green border to indicate educational content
+    videoElement.style.border = '2px solid #4ade80';
+    videoElement.style.borderRadius = '8px';
+
+    // Add badge
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #4ade80;
+      color: #000;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      z-index: 100;
+      pointer-events: none;
+    `;
+    badge.textContent = '✓ Educational';
+
+    const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
+    if (thumbnail) {
+      thumbnail.style.position = 'relative';
+      thumbnail.appendChild(badge);
+    }
+
     stats.liked++;
     updateStats();
     return true;
   }
 
   function executeYouTubeHide(videoElement) {
-    const menuButton = videoElement.querySelector('button[aria-label*="menu"], button.yt-icon-button');
-    if (!menuButton) return false;
+    // Find the 3-dot menu button
+    const menuButton = videoElement.querySelector('button[aria-label="Action menu"], button#button[aria-label*="menu"], ytd-menu-renderer button');
+    if (!menuButton) {
+      console.log('[Focus Feed] ⚠️ Menu button not found');
+      return false;
+    }
 
-    console.log(`[Focus Feed] ✗ Hiding junk video`);
+    const titleElement = videoElement.querySelector('#video-title');
+    const title = titleElement ? titleElement.textContent.trim() : 'Unknown';
+    console.log(`[Focus Feed] ✗ Hiding junk: "${title}"`);
 
-    // Simulate clicking "Not interested"
-    // In practice: menuButton.click() -> wait -> click "Not interested"
-    // For MVP, we'll just hide it visually
-    videoElement.style.opacity = '0.3';
-    videoElement.style.pointerEvents = 'none';
+    try {
+      // Click the menu button
+      menuButton.click();
 
-    stats.hidden++;
-    updateStats();
-    return true;
+      // Wait for menu to appear, then click "Not interested"
+      setTimeout(() => {
+        // Look for "Not interested" option in the popup menu
+        const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-listbox ytd-menu-service-item-renderer');
+
+        for (let item of menuItems) {
+          const text = item.textContent.toLowerCase();
+          if (text.includes('not interested') || text.includes('don\'t recommend')) {
+            console.log('[Focus Feed] ✓ Clicking "Not interested"');
+            item.click();
+
+            // Hide the video visually too
+            videoElement.style.transition = 'opacity 0.5s';
+            videoElement.style.opacity = '0.2';
+            videoElement.style.filter = 'grayscale(100%)';
+
+            stats.hidden++;
+            updateStats();
+            return true;
+          }
+        }
+
+        // If we couldn't find "Not interested", just hide visually
+        console.log('[Focus Feed] ⚠️ Could not find "Not interested" option, hiding visually');
+        videoElement.style.opacity = '0.2';
+        videoElement.style.filter = 'grayscale(100%)';
+        videoElement.style.pointerEvents = 'none';
+
+        stats.hidden++;
+        updateStats();
+      }, 500); // Wait 500ms for menu to render
+
+      return true;
+    } catch (error) {
+      console.error('[Focus Feed] Error hiding video:', error);
+      return false;
+    }
   }
 
   // TIKTOK MODULE
