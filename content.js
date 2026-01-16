@@ -3,10 +3,13 @@
 
   let trainingEnabled = true;
   let selectedPersona = 'polymath';
+  let trainingIntensity = 80;
   let classifier = null;
   let observer = null;
   let processedElements = new Set();
   let stats = { liked: 0, hidden: 0, neutral: 0 };
+  let trustedChannels = [];
+  let blockedChannels = [];
   const hostname = window.location.hostname;
 
   // Rate limiting config
@@ -23,9 +26,21 @@
   let actionProcessorInterval = null;
 
   // Initialize
-  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'dailyStats'], (result) => {
+  chrome.storage.sync.get([
+    'focusEnabled',
+    'selectedPersona',
+    'trainingIntensity',
+    'customKeywords',
+    'customPersonas',
+    'trustedChannels',
+    'blockedChannels',
+    'dailyStats'
+  ], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
     selectedPersona = result.selectedPersona || 'polymath';
+    trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
+    trustedChannels = result.trustedChannels || [];
+    blockedChannels = result.blockedChannels || [];
 
     // Reset daily stats if it's a new day
     const today = new Date().toDateString();
@@ -35,7 +50,7 @@
       chrome.storage.sync.set({ dailyStats: { date: today, count: 0 } });
     }
 
-    initClassifier();
+    initClassifier(result.customKeywords, result.customPersonas);
     init();
   });
 
@@ -45,15 +60,42 @@
     }
     if (changes.selectedPersona) {
       selectedPersona = changes.selectedPersona.newValue;
-      initClassifier();
     }
+    if (changes.trainingIntensity) {
+      trainingIntensity = changes.trainingIntensity.newValue;
+    }
+    if (changes.trustedChannels) {
+      trustedChannels = changes.trustedChannels.newValue || [];
+    }
+    if (changes.blockedChannels) {
+      blockedChannels = changes.blockedChannels.newValue || [];
+    }
+
+    // Reload classifier if persona or keywords changed
+    if (changes.selectedPersona || changes.customKeywords || changes.customPersonas) {
+      chrome.storage.sync.get(['customKeywords', 'customPersonas'], (result) => {
+        initClassifier(result.customKeywords, result.customPersonas);
+      });
+    }
+
     init();
   });
 
-  function initClassifier() {
-    // Load classifier rules inline since we can't import in content script
-    const rules = getClassifierRules();
-    const personaRules = rules[selectedPersona] || rules.polymath;
+  function initClassifier(customKeywords, customPersonas) {
+    // Check if we have custom keywords for this persona
+    let personaRules;
+
+    if (customKeywords && customKeywords[selectedPersona]) {
+      // Use custom keywords
+      personaRules = customKeywords[selectedPersona];
+    } else if (customPersonas && customPersonas[selectedPersona]) {
+      // Use custom persona
+      personaRules = customPersonas[selectedPersona];
+    } else {
+      // Use default rules
+      const rules = getClassifierRules();
+      personaRules = rules[selectedPersona] || rules.polymath;
+    }
 
     // Pre-normalize keywords for performance
     const normalizedRules = {
@@ -63,15 +105,31 @@
 
     classifier = {
       rules: normalizedRules,
-      classify: function(text) {
+      classify: function(text, channelName = '') {
         if (!text) return 'neutral';
+
+        // Check channel whitelist/blacklist first (highest priority)
+        if (channelName) {
+          const normalizedChannel = channelName.toLowerCase();
+
+          // Check blocked channels
+          if (blockedChannels.some(c => normalizedChannel.includes(c.toLowerCase()))) {
+            return 'junk';
+          }
+
+          // Check trusted channels
+          if (trustedChannels.some(c => normalizedChannel.includes(c.toLowerCase()))) {
+            return 'educational';
+          }
+        }
+
         const normalizedText = text.toLowerCase();
 
-        // Check junk first (higher priority)
+        // Check junk keywords
         const hasJunk = this.rules.junk.some(k => normalizedText.includes(k));
         if (hasJunk) return 'junk';
 
-        // Check educational
+        // Check educational keywords
         const hasEducational = this.rules.educational.some(k => normalizedText.includes(k));
         if (hasEducational) return 'educational';
 
@@ -131,16 +189,18 @@
 
     const title = titleElement.textContent.trim();
     const channel = channelElement ? channelElement.textContent.trim() : '';
-    const classification = classifier.classify(`${title} ${channel}`);
+    const classification = classifier.classify(`${title} ${channel}`, channel);
 
-    if (classification === 'educational') {
+    // Respect training intensity
+    if (classification === 'educational' && trainingIntensity >= 30) {
       queueAction({
         type: 'youtube-like',
         element: videoElement,
         title,
         channel
       });
-    } else if (classification === 'junk') {
+    } else if (classification === 'junk' && trainingIntensity >= 70) {
+      // Only hide junk at 70%+ intensity
       queueAction({
         type: 'youtube-hide',
         element: videoElement,

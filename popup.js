@@ -4,6 +4,10 @@ const status = document.getElementById('status');
 const likedCount = document.getElementById('likedCount');
 const hiddenCount = document.getElementById('hiddenCount');
 const dailyCount = document.getElementById('dailyCount');
+const intensitySlider = document.getElementById('intensitySlider');
+const intensityValue = document.getElementById('intensityValue');
+const settingsBtn = document.getElementById('settingsBtn');
+const exportBtn = document.getElementById('exportBtn');
 
 const personas = [
   {
@@ -58,11 +62,14 @@ const personas = [
   }
 ];
 
-chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'dailyStats'], (result) => {
+chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats'], (result) => {
   const focusEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
   const selectedPersona = result.selectedPersona || 'polymath';
+  const intensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
 
   toggleSwitch.checked = focusEnabled;
+  intensitySlider.value = intensity;
+  intensityValue.textContent = intensity + '%';
   updateStatus(focusEnabled);
   renderPersonas(selectedPersona);
   loadStats();
@@ -145,4 +152,45 @@ function reloadSocialMediaTabs() {
       });
     });
   });
+}
+
+// Intensity slider handler
+intensitySlider.addEventListener('input', (e) => {
+  const value = parseInt(e.target.value);
+  intensityValue.textContent = value + '%';
+  chrome.storage.sync.set({ trainingIntensity: value }, () => {
+    reloadSocialMediaTabs();
+  });
+});
+
+// Settings button handler
+settingsBtn.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+});
+
+// Export button handler
+exportBtn.addEventListener('click', () => {
+  chrome.storage.sync.get(['selectedPersona', 'customPersonas'], (result) => {
+    const personaId = result.selectedPersona || 'polymath';
+
+    // Check if it's a custom persona
+    if (result.customPersonas && result.customPersonas[personaId]) {
+      const persona = result.customPersonas[personaId];
+      downloadJSON(persona, `${personaId}-persona.json`);
+    } else {
+      // Export default persona
+      const persona = personas.find(p => p.id === personaId);
+      alert('Default personas cannot be exported. Create a custom persona first!');
+    }
+  });
+});
+
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
