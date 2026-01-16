@@ -4,25 +4,60 @@ const status = document.getElementById('status');
 
 const personas = [
   {
-    id: 'builder',
-    name: 'The Builder',
-    description: 'Engineering, Science & Innovation'
+    id: 'polymath',
+    name: 'The Polymath',
+    description: 'Renaissance thinking across disciplines'
+  },
+  {
+    id: 'engineer',
+    name: 'The Engineer',
+    description: 'Technology, systems & building'
   },
   {
     id: 'strategist',
     name: 'The Strategist',
-    description: 'Business, Finance & Markets'
+    description: 'Business, finance & planning'
   },
   {
     id: 'stoic',
     name: 'The Stoic',
-    description: 'Philosophy, Psychology & Self-Improvement'
+    description: 'Philosophy & mental resilience'
+  },
+  {
+    id: 'scientist',
+    name: 'The Scientist',
+    description: 'Research, discovery & inquiry'
+  },
+  {
+    id: 'artist',
+    name: 'The Artist',
+    description: 'Creativity, design & expression'
+  },
+  {
+    id: 'warrior',
+    name: 'The Warrior',
+    description: 'Discipline, strength & performance'
+  },
+  {
+    id: 'healer',
+    name: 'The Healer',
+    description: 'Health, longevity & wellness'
+  },
+  {
+    id: 'explorer',
+    name: 'The Explorer',
+    description: 'Discovery, adventure & frontiers'
+  },
+  {
+    id: 'sage',
+    name: 'The Sage',
+    description: 'Wisdom, meaning & understanding'
   }
 ];
 
 chrome.storage.sync.get(['focusEnabled', 'selectedPersona'], (result) => {
   const focusEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
-  const selectedPersona = result.selectedPersona || 'builder';
+  const selectedPersona = result.selectedPersona || 'polymath';
 
   toggleSwitch.checked = focusEnabled;
   updateStatus(focusEnabled);
@@ -33,7 +68,7 @@ toggleSwitch.addEventListener('change', (e) => {
   const enabled = e.target.checked;
   chrome.storage.sync.set({ focusEnabled: enabled }, () => {
     updateStatus(enabled);
-    reloadYouTubeTabs();
+    reloadSocialMediaTabs();
   });
 });
 
@@ -51,7 +86,7 @@ function renderPersonas(selected) {
     option.addEventListener('click', () => {
       chrome.storage.sync.set({ selectedPersona: persona.id }, () => {
         renderPersonas(persona.id);
-        reloadYouTubeTabs();
+        reloadSocialMediaTabs();
       });
     });
 
@@ -60,15 +95,26 @@ function renderPersonas(selected) {
 }
 
 function updateStatus(enabled) {
-  status.textContent = enabled ? 'Active - YouTube feed is being replaced' : 'Disabled - Showing default YouTube feed';
+  status.textContent = enabled ? 'Active - Blocking algorithmic feeds' : 'Disabled - Showing default feeds';
   status.style.background = enabled ? '#1a3a1a' : '#272727';
   status.style.color = enabled ? '#4ade80' : '#aaa';
 }
 
-function reloadYouTubeTabs() {
-  chrome.tabs.query({ url: '*://*.youtube.com/*' }, (tabs) => {
-    tabs.forEach(tab => {
-      chrome.tabs.reload(tab.id);
+function reloadSocialMediaTabs() {
+  const platforms = [
+    '*://*.youtube.com/*',
+    '*://*.facebook.com/*',
+    '*://*.instagram.com/*',
+    '*://*.twitter.com/*',
+    '*://*.x.com/*',
+    '*://*.tiktok.com/*'
+  ];
+
+  platforms.forEach(url => {
+    chrome.tabs.query({ url }, (tabs) => {
+      tabs.forEach(tab => {
+        chrome.tabs.reload(tab.id);
+      });
     });
   });
 }
