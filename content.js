@@ -1,6 +1,14 @@
 (function() {
   'use strict';
 
+  // --- SAFETY CHECK ---
+  if (typeof FOCUS_PRESETS === 'undefined') {
+    console.error("[Focus Feed] ❌ CRITICAL ERROR: presets.js is missing or not loaded. Replacements will fail.");
+  }
+  if (typeof ContentClassifier === 'undefined') {
+    console.error("[Focus Feed] ❌ CRITICAL ERROR: classifier.js is missing or not loaded. Detection will fail.");
+  }
+
   // --- CONFIG ---
   let trainingEnabled = true;
   let selectedPersona = 'polymath';
@@ -10,8 +18,8 @@
   let processedElements = new Set();
   const hostname = window.location.hostname;
   
-  // Rate limits (Aggressive)
-  const RATE_LIMITS = { maxActionsPerMinute: 60, minDelayBetweenActions: 800, dailyActionLimit: 1000 };
+  // Rate limits
+  const RATE_LIMITS = { maxActionsPerMinute: 60, minDelayBetweenActions: 500, dailyActionLimit: 2000 };
   let actionQueue = [];
   let lastActionTime = 0;
   let dailyActionCount = 0;
@@ -27,62 +35,105 @@
     if (typeof ContentClassifier !== 'undefined') {
         classifier = new ContentClassifier(selectedPersona);
     }
+    
+    // Ensure Stats Exist
+    if (!result.lifetimeStats) {
+        chrome.storage.sync.set({ lifetimeStats: { liked: 0, hidden: 0 } });
+    }
 
     init();
   });
 
-  // (Keep your storage listeners here...)
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.focusEnabled) trainingEnabled = changes.focusEnabled.newValue;
+    if (changes.selectedPersona) {
+        selectedPersona = changes.selectedPersona.newValue;
+        if (typeof ContentClassifier !== 'undefined') classifier = new ContentClassifier(selectedPersona);
+    }
+  });
 
   function init() {
-    if (observer) observer.disconnect();
     if (!trainingEnabled) return;
-    console.log(`[Focus Feed] ⚡ SIGNAL FLOODING ACTIVE: ${selectedPersona}`);
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('focus_mode') === 'turbo') {
+        console.log(`[Focus Feed] 👻 GHOST MODE ACTIVE`);
+        runTurboSequence();
+        return;
+    }
+
+    console.log(`[Focus Feed] Active: ${selectedPersona}`);
     runScan();
     startObserver();
     startActionProcessor();
   }
 
+  // --- TURBO SEQUENCE ---
+  function runTurboSequence() {
+     let attempts = 0;
+     const interval = setInterval(() => {
+         const results = document.querySelectorAll('ytd-video-renderer');
+         if (results.length > 0) {
+             clearInterval(interval);
+             let actions = 0;
+             for (let i = 0; i < Math.min(results.length, 3); i++) {
+                 const video = results[i];
+                 const likeBtn = video.querySelector('#like-button button, button[aria-label*="like"]');
+                 if (likeBtn) { likeBtn.click(); actions++; }
+                 
+                 const subBtn = video.querySelector('ytd-subscribe-button-renderer button');
+                 if (subBtn && !subBtn.hasAttribute('subscribed')) { subBtn.click(); actions++; }
+             }
+             
+             if (actions > 0) incrementLifetimeStats('liked', actions);
+
+             setTimeout(() => { window.close(); }, 2500);
+         }
+         attempts++;
+         if (attempts > 20) { clearInterval(interval); window.close(); }
+     }, 500);
+  }
+
+  // --- NORMAL SCAN ---
   function runScan() {
-    // Platform Routing
-    if (hostname.includes('youtube.com')) {
-        if (window.location.pathname.includes('/results')) handleYouTubeSearch(); // NEW
-        else handleYouTube();
-    } 
+    if (hostname.includes('youtube.com')) handleYouTube();
     else if (hostname.includes('tiktok.com')) handleTikTok();
     else if (hostname.includes('twitter.com') || hostname.includes('x.com')) handleX();
   }
 
-  // --- PRESET REPLACEMENT (Keep your existing function) ---
+  // --- REPLACEMENT ENGINE ---
   function replaceWithPreset(element, contentTitle) {
-     // ... (Your existing replacement logic) ...
-     // Make sure you update stats!
-     incrementLifetimeStats('hidden');
-  }
-
-  // --- NEW: YOUTUBE SEARCH HANDLER (For Turbo Train) ---
-  function handleYouTubeSearch() {
-    const results = document.querySelectorAll('ytd-video-renderer, ytd-reel-item-renderer');
+    if (!element || element.dataset.focusProcessed) return;
     
-    // Only process the top 3 results to save resources/prevent spam detection
-    for (let i = 0; i < Math.min(results.length, 3); i++) {
-        const video = results[i];
-        if (processedElements.has(video)) continue;
-        processedElements.add(video);
-
-        const title = video.querySelector('#video-title')?.textContent.trim();
-        const classification = classifier.classify(title);
-
-        if (classification === 'educational') {
-            // Queue a like/interaction
-            queueAction({ type: 'youtube-like', element: video });
-            
-            // STRONG SIGNAL: Queue a subscribe if possible
-            queueAction({ type: 'youtube-subscribe', element: video });
-        }
+    // PRESET CHECK
+    if (typeof FOCUS_PRESETS === 'undefined' || !FOCUS_PRESETS[selectedPersona]) {
+        console.warn(`[Focus Feed] Missing presets for ${selectedPersona}`);
+        return;
     }
+
+    const personaContent = FOCUS_PRESETS[selectedPersona];
+    const types = ['fact', 'quote', 'headline'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    let htmlContent = '';
+    
+    if (type === 'fact') {
+        const fact = personaContent.facts[Math.floor(Math.random() * personaContent.facts.length)];
+        htmlContent = `<div class="focus-ad-replacement focus-fact" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#667eea; text-transform:uppercase; margin-bottom:5px;">${selectedPersona} Fact</div><div style="font-size:14px; line-height:1.4;">${fact}</div></div>`;
+    } else if (type === 'quote') {
+        const quote = personaContent.quotes[Math.floor(Math.random() * personaContent.quotes.length)];
+        htmlContent = `<div class="focus-ad-replacement focus-quote" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#f093fb; text-transform:uppercase; margin-bottom:5px;">Wisdom</div><div style="font-size:14px; font-style:italic;">${quote}</div></div>`;
+    } else {
+        const headline = personaContent.headlines[Math.floor(Math.random() * personaContent.headlines.length)];
+        htmlContent = `<div class="focus-ad-replacement" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#aaa; text-transform:uppercase; margin-bottom:5px;">Recommended</div><a href="${headline.link}" target="_blank" style="color:#fff; text-decoration:none; font-weight:bold; font-size:14px;">${headline.title}</a></div>`;
+    }
+
+    element.innerHTML = htmlContent;
+    element.dataset.focusProcessed = "true";
+    incrementLifetimeStats('hidden', 1);
   }
 
-  // --- UPDATED YOUTUBE FEED HANDLER ---
+  // --- HANDLERS ---
   function handleYouTube() {
     const selectors = ['ytd-rich-item-renderer', 'ytd-compact-video-renderer', 'ytd-video-renderer'];
     selectors.forEach(sel => {
@@ -91,80 +142,121 @@
             processedElements.add(video);
 
             const title = video.querySelector('#video-title')?.textContent.trim();
-            const classification = classifier.classify(title);
-
-            if (classification === 'educational') {
-                if (Math.random() * 100 < trainingIntensity) {
+            if (title) {
+                const classification = classifier.classify(title);
+                if (classification === 'educational' && Math.random() * 100 < trainingIntensity) {
                     queueAction({ type: 'youtube-like', element: video });
-                    
-                    // 20% chance to Subscribe on regular feed (don't overdo it)
-                    if (Math.random() < 0.2) queueAction({ type: 'youtube-subscribe', element: video });
+                } else if (classification === 'junk') {
+                    replaceWithPreset(video, title);
                 }
-            } else if (classification === 'junk') {
-                replaceWithPreset(video, title);
             }
         });
     });
   }
 
-  // --- EXECUTION LOGIC (Added Subscribe) ---
+  function handleX() {
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+    tweets.forEach(tweet => {
+        if (processedElements.has(tweet)) return;
+        processedElements.add(tweet);
+        const textEl = tweet.querySelector('[data-testid="tweetText"]');
+        if (textEl) {
+            const text = textEl.textContent;
+            const classification = classifier.classify(text);
+            if (classification === 'educational') queueAction({ type: 'x-like', element: tweet });
+            else if (classification === 'junk') {
+                 const container = textEl.closest('div[lang]') || textEl.parentElement;
+                 if (container) replaceWithPreset(container, text);
+            }
+        }
+    });
+  }
+
+  function handleTikTok() {
+     const videos = document.querySelectorAll('[data-e2e="recommend-list-item-container"]');
+     videos.forEach(video => {
+        if (processedElements.has(video)) return;
+        processedElements.add(video);
+        const desc = video.querySelector('[data-e2e="browse-video-desc"]');
+        if (desc) {
+            const classification = classifier.classify(desc.textContent);
+            if (classification === 'educational') queueAction({ type: 'tiktok-like', element: video });
+            else if (classification === 'junk') replaceWithPreset(video, desc.textContent);
+        }
+    });
+  }
+
+  // --- ACTIONS ---
   function executeYouTubeLike(el) {
-    // Look for various button types (inline, shorts, etc)
     const btn = el.querySelector('#like-button button, button[aria-label*="like"]');
-    if (btn && btn.getAttribute('aria-pressed') !== 'true') {
-        btn.click();
-        console.log(`[Focus Feed] Like sent.`);
-        return true;
-    }
+    if (btn && btn.getAttribute('aria-pressed') !== 'true') { btn.click(); return true; }
+    return false;
+  }
+  function executeXLike(el) {
+    const btn = el.querySelector('[data-testid="like"]');
+    const unlike = el.querySelector('[data-testid="unlike"]');
+    if (btn && !unlike) { btn.click(); return true; }
+    return false;
+  }
+  function executeTikTokLike(el) {
+    const btn = el.querySelector('[data-e2e="like-icon"]');
+    if (btn) { btn.click(); return true; }
     return false;
   }
 
-  function executeYouTubeSubscribe(el) {
-    // This is tricky as the subscribe button isn't always inside the video card in feeds.
-    // It usually works best on the Watch Page or Search Results.
-    const subBtn = el.querySelector('ytd-subscribe-button-renderer button, button[aria-label*="Subscribe"]');
-    
-    // Check if valid and NOT already subscribed
-    if (subBtn && !subBtn.hasAttribute('subscribed') && subBtn.textContent.includes('Subscribe')) {
-        subBtn.click();
-        console.log(`[Focus Feed] 🌟 AUTO-SUBSCRIBED for maximum signal.`);
-        return true;
-    }
-    return false;
+  // --- QUEUE ---
+  function queueAction(action) {
+    if (dailyActionCount >= RATE_LIMITS.dailyActionLimit) return;
+    actionQueue.push(action);
   }
 
-  // ... (Keep TikTok/X Handlers from previous turn) ...
+  function startActionProcessor() {
+    if (actionProcessorInterval) clearInterval(actionProcessorInterval);
+    actionProcessorInterval = setInterval(() => {
+      if (actionQueue.length === 0 || !trainingEnabled) return;
+      const now = Date.now();
+      if (now - lastActionTime < RATE_LIMITS.minDelayBetweenActions) return;
 
-  // --- ACTION QUEUE ---
+      const action = actionQueue.shift();
+      const success = executeAction(action);
+      
+      if (success) {
+          lastActionTime = now;
+          dailyActionCount++;
+          chrome.storage.sync.set({ dailyStats: { date: new Date().toDateString(), count: dailyActionCount } });
+          incrementLifetimeStats('liked', 1);
+      }
+    }, 200);
+  }
+
   function executeAction(action) {
     try {
-        let success = false;
-        if (action.type === 'youtube-like') success = executeYouTubeLike(action.element);
-        if (action.type === 'youtube-subscribe') success = executeYouTubeSubscribe(action.element); // NEW
-        if (action.type === 'tiktok-like') success = executeTikTokLike(action.element);
-        if (action.type === 'x-like') success = executeXLike(action.element);
-        
-        if (success) incrementLifetimeStats('liked');
-        return success;
-    } catch(e) { console.error(e); return false; }
+        if (action.type === 'youtube-like') return executeYouTubeLike(action.element);
+        if (action.type === 'x-like') return executeXLike(action.element);
+        if (action.type === 'tiktok-like') return executeTikTokLike(action.element);
+    } catch(e) { console.error(e); }
+    return false;
   }
 
-  // ... (Keep queue processing and stats logic from previous turn) ...
-  
-  function incrementLifetimeStats(type) {
-    chrome.storage.sync.get(['lifetimeStats'], (result) => {
-        const stats = result.lifetimeStats || { liked: 0, hidden: 0 };
-        stats[type] = (stats[type] || 0) + 1;
+  function incrementLifetimeStats(type, amount) {
+    chrome.storage.sync.get(['lifetimeStats'], (res) => {
+        const stats = res.lifetimeStats || { liked: 0, hidden: 0 };
+        stats[type] = (stats[type] || 0) + (amount || 0);
         chrome.storage.sync.set({ lifetimeStats: stats });
     });
   }
 
-  // ... (Keep Observer logic) ...
   function startObserver() {
     observer = new MutationObserver((mutations) => {
         if (mutations.some(m => m.addedNodes.length)) runScan();
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    
+    setInterval(() => {
+        if (processedElements.size > 800) {
+            const arr = Array.from(processedElements);
+            processedElements = new Set(arr.slice(300));
+        }
+    }, 30000);
   }
-
 })();
