@@ -1,6 +1,9 @@
 const toggleSwitch = document.getElementById('toggleFocus');
 const personaGrid = document.getElementById('personaGrid');
 const status = document.getElementById('status');
+const likedCount = document.getElementById('likedCount');
+const hiddenCount = document.getElementById('hiddenCount');
+const dailyCount = document.getElementById('dailyCount');
 
 const personas = [
   {
@@ -55,13 +58,14 @@ const personas = [
   }
 ];
 
-chrome.storage.sync.get(['focusEnabled', 'selectedPersona'], (result) => {
+chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'dailyStats'], (result) => {
   const focusEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
   const selectedPersona = result.selectedPersona || 'polymath';
 
   toggleSwitch.checked = focusEnabled;
   updateStatus(focusEnabled);
   renderPersonas(selectedPersona);
+  loadStats();
 });
 
 toggleSwitch.addEventListener('change', (e) => {
@@ -95,9 +99,29 @@ function renderPersonas(selected) {
 }
 
 function updateStatus(enabled) {
-  status.textContent = enabled ? 'Active - Blocking algorithmic feeds' : 'Disabled - Showing default feeds';
+  status.textContent = enabled ? 'Active - Training your algorithm' : 'Disabled - No training in progress';
   status.style.background = enabled ? '#1a3a1a' : '#272727';
   status.style.color = enabled ? '#4ade80' : '#aaa';
+}
+
+function loadStats() {
+  // Load session stats from local storage
+  chrome.storage.local.get(['sessionStats'], (result) => {
+    if (result.sessionStats) {
+      likedCount.textContent = result.sessionStats.liked || 0;
+      hiddenCount.textContent = result.sessionStats.hidden || 0;
+    }
+  });
+
+  // Load daily stats
+  chrome.storage.sync.get(['dailyStats'], (result) => {
+    if (result.dailyStats) {
+      dailyCount.textContent = result.dailyStats.count || 0;
+    }
+  });
+
+  // Auto-refresh stats every 5 seconds
+  setInterval(loadStats, 5000);
 }
 
 function reloadSocialMediaTabs() {

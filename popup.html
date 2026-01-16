@@ -132,6 +132,45 @@
       color: #aaa;
     }
 
+    .stats-section {
+      margin-top: 20px;
+    }
+
+    .stats-section h2 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #aaa;
+      font-weight: 500;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .stat-card {
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+      border-radius: 8px;
+      border: 1px solid #667eea30;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
     .status {
       margin-top: 16px;
       padding: 8px;
@@ -152,6 +191,24 @@
       <input type="checkbox" id="toggleFocus">
       <span class="slider"></span>
     </label>
+  </div>
+
+  <div class="stats-section">
+    <h2>Training Progress</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="likedCount">0</div>
+        <div class="stat-label">Educational Liked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="hiddenCount">0</div>
+        <div class="stat-label">Junk Hidden</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="dailyCount">0</div>
+        <div class="stat-label">Today's Actions</div>
+      </div>
+    </div>
   </div>
 
   <div class="persona-section">
