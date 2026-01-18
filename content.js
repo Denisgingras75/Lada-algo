@@ -1,164 +1,70 @@
 (function() {
   'use strict';
 
+  // --- SAFETY CHECK ---
+  if (typeof FOCUS_PRESETS === 'undefined') {
+    console.error("[Focus Feed] ❌ CRITICAL ERROR: presets.js is missing or not loaded. Replacements will fail.");
+  }
+  if (typeof ContentClassifier === 'undefined') {
+    console.error("[Focus Feed] ❌ CRITICAL ERROR: classifier.js is missing or not loaded. Detection will fail.");
+  }
+
+  // --- CONFIG ---
   let trainingEnabled = true;
   let selectedPersona = 'polymath';
   let trainingIntensity = 80;
   let classifier = null;
   let observer = null;
   let processedElements = new Set();
-  let stats = { liked: 0, hidden: 0, neutral: 0 };
-  let trustedChannels = [];
-  let blockedChannels = [];
   const hostname = window.location.hostname;
-
-  // Rate limiting config
-  const RATE_LIMITS = {
-    maxActionsPerMinute: 8,
-    minDelayBetweenActions: 3000,
-    maxDelayBetweenActions: 8000,
-    dailyActionLimit: 200
-  };
-
+  
+  // Rate limits
+  const RATE_LIMITS = { maxActionsPerMinute: 60, minDelayBetweenActions: 500, dailyActionLimit: 2000 };
   let actionQueue = [];
   let lastActionTime = 0;
   let dailyActionCount = 0;
   let actionProcessorInterval = null;
   let debugPanel = null;
 
-  // Initialize
-  chrome.storage.sync.get([
-    'focusEnabled',
-    'selectedPersona',
-    'trainingIntensity',
-    'customKeywords',
-    'customPersonas',
-    'trustedChannels',
-    'blockedChannels',
-    'dailyStats'
-  ], (result) => {
+  // --- INIT ---
+  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats', 'lifetimeStats'], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
     selectedPersona = result.selectedPersona || 'polymath';
     trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
-    trustedChannels = result.trustedChannels || [];
-    blockedChannels = result.blockedChannels || [];
-
-    // Reset daily stats if it's a new day
-    const today = new Date().toDateString();
-    if (result.dailyStats && result.dailyStats.date === today) {
-      dailyActionCount = result.dailyStats.count || 0;
-    } else {
-      chrome.storage.sync.set({ dailyStats: { date: today, count: 0 } });
+    
+    // Init Classifier
+    if (typeof ContentClassifier !== 'undefined') {
+        classifier = new ContentClassifier(selectedPersona);
+    }
+    
+    // Ensure Stats Exist
+    if (!result.lifetimeStats) {
+        chrome.storage.sync.set({ lifetimeStats: { liked: 0, hidden: 0 } });
     }
 
-    initClassifier(result.customKeywords, result.customPersonas);
     init();
   });
 
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.focusEnabled) {
-      trainingEnabled = changes.focusEnabled.newValue;
-    }
+    if (changes.focusEnabled) trainingEnabled = changes.focusEnabled.newValue;
     if (changes.selectedPersona) {
-      selectedPersona = changes.selectedPersona.newValue;
+        selectedPersona = changes.selectedPersona.newValue;
+        if (typeof ContentClassifier !== 'undefined') classifier = new ContentClassifier(selectedPersona);
     }
-    if (changes.trainingIntensity) {
-      trainingIntensity = changes.trainingIntensity.newValue;
-    }
-    if (changes.trustedChannels) {
-      trustedChannels = changes.trustedChannels.newValue || [];
-    }
-    if (changes.blockedChannels) {
-      blockedChannels = changes.blockedChannels.newValue || [];
-    }
-
-    // Reload classifier if persona or keywords changed
-    if (changes.selectedPersona || changes.customKeywords || changes.customPersonas) {
-      chrome.storage.sync.get(['customKeywords', 'customPersonas'], (result) => {
-        initClassifier(result.customKeywords, result.customPersonas);
-      });
-    }
-
-    init();
   });
 
-  function initClassifier(customKeywords, customPersonas) {
-    // Check if we have custom keywords for this persona
-    let personaRules;
-
-    if (customKeywords && customKeywords[selectedPersona]) {
-      // Use custom keywords
-      personaRules = customKeywords[selectedPersona];
-    } else if (customPersonas && customPersonas[selectedPersona]) {
-      // Use custom persona
-      personaRules = customPersonas[selectedPersona];
-    } else {
-      // Use default rules
-      const rules = getClassifierRules();
-      personaRules = rules[selectedPersona] || rules.polymath;
-    }
-
-    // Pre-normalize keywords for performance
-    const normalizedRules = {
-      educational: personaRules.educational.map(k => k.toLowerCase()),
-      junk: personaRules.junk.map(k => k.toLowerCase())
-    };
-
-    classifier = {
-      rules: normalizedRules,
-      classify: function(text, channelName = '') {
-        if (!text) return 'neutral';
-
-        // Check channel whitelist/blacklist first (highest priority)
-        if (channelName) {
-          const normalizedChannel = channelName.toLowerCase();
-
-          // Check blocked channels
-          if (blockedChannels.some(c => normalizedChannel.includes(c.toLowerCase()))) {
-            return 'junk';
-          }
-
-          // Check trusted channels
-          if (trustedChannels.some(c => normalizedChannel.includes(c.toLowerCase()))) {
-            return 'educational';
-          }
-        }
-
-        const normalizedText = text.toLowerCase();
-
-        // Check junk keywords
-        const hasJunk = this.rules.junk.some(k => normalizedText.includes(k));
-        if (hasJunk) return 'junk';
-
-        // Check educational keywords
-        const hasEducational = this.rules.educational.some(k => normalizedText.includes(k));
-        if (hasEducational) return 'educational';
-
-        return 'neutral';
-      }
-    };
-  }
-
   function init() {
-    if (observer) observer.disconnect();
-
-    if (!trainingEnabled) {
-      console.log('[Focus Feed] Training disabled');
-      return;
+    if (!trainingEnabled) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('focus_mode') === 'turbo') {
+        console.log(`[Focus Feed] 👻 GHOST MODE ACTIVE`);
+        runTurboSequence();
+        return;
     }
 
-    console.log(`[Focus Feed] Training active - Persona: ${selectedPersona}`);
-
-    if (hostname.includes('youtube.com')) {
-      handleYouTube();
-    } else if (hostname.includes('tiktok.com')) {
-      handleTikTok();
-    } else if (hostname.includes('facebook.com')) {
-      handleFacebook();
-    } else if (hostname.includes('instagram.com')) {
-      handleInstagram();
-    }
-
+    console.log(`[Focus Feed] Active: ${selectedPersona}`);
+    runScan();
     startObserver();
     startActionProcessor();
     createDebugPanel();
@@ -217,20 +123,30 @@
     }
   }
 
-  // YOUTUBE MODULE
-  function handleYouTube() {
-    if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/feed')) return;
+  // --- TURBO SEQUENCE ---
+  function runTurboSequence() {
+     let attempts = 0;
+     const interval = setInterval(() => {
+         const results = document.querySelectorAll('ytd-video-renderer');
+         if (results.length > 0) {
+             clearInterval(interval);
+             let actions = 0;
+             for (let i = 0; i < Math.min(results.length, 3); i++) {
+                 const video = results[i];
+                 const likeBtn = video.querySelector('#like-button button, button[aria-label*="like"]');
+                 if (likeBtn) { likeBtn.click(); actions++; }
+                 
+                 const subBtn = video.querySelector('ytd-subscribe-button-renderer button');
+                 if (subBtn && !subBtn.hasAttribute('subscribed')) { subBtn.click(); actions++; }
+             }
+             
+             if (actions > 0) incrementLifetimeStats('liked', actions);
 
-    const videoSelectors = [
-      'ytd-rich-item-renderer',
-      'ytd-video-renderer',
-      'ytd-grid-video-renderer'
-    ];
-
-    videoSelectors.forEach(selector => {
-      const videos = document.querySelectorAll(selector);
-      videos.forEach(video => processYouTubeVideo(video));
-    });
+             setTimeout(() => { window.close(); }, 2500);
+         }
+         attempts++;
+         if (attempts > 20) { clearInterval(interval); window.close(); }
+     }, 500);
   }
 
   function processYouTubeVideo(videoElement) {
@@ -402,229 +318,146 @@
     } else {
       stats.neutral++;
     }
-  }
 
-  function executeTikTokLike(videoElement) {
-    const likeButton = videoElement.querySelector('[data-e2e="like-icon"], [data-e2e="browse-like"]');
-    if (!likeButton) return false;
-
-    console.log(`[Focus Feed] ✓ Liking educational TikTok`);
-    // likeButton.click(); // Uncomment to actually click
-
-    stats.liked++;
-    updateStats();
-    return true;
-  }
-
-  function executeTikTokHide(videoElement) {
-    console.log(`[Focus Feed] ✗ Hiding junk TikTok`);
-    videoElement.style.opacity = '0.3';
-    videoElement.style.pointerEvents = 'none';
-
-    stats.hidden++;
-    updateStats();
-    return true;
-  }
-
-  // FACEBOOK MODULE
-  function handleFacebook() {
-    const posts = document.querySelectorAll('[role="article"], [data-pagelet*="FeedUnit"]');
-    posts.forEach(post => processFacebookPost(post));
-  }
-
-  function processFacebookPost(postElement) {
-    if (processedElements.has(postElement)) return;
-    processedElements.add(postElement);
-
-    const textContent = postElement.textContent;
-    const classification = classifier.classify(textContent);
-
-    if (classification === 'educational') {
-      queueAction({
-        type: 'facebook-like',
-        element: postElement
-      });
-    } else if (classification === 'junk') {
-      queueAction({
-        type: 'facebook-hide',
-        element: postElement
-      });
+    const personaContent = FOCUS_PRESETS[selectedPersona];
+    const types = ['fact', 'quote', 'headline'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    let htmlContent = '';
+    
+    if (type === 'fact') {
+        const fact = personaContent.facts[Math.floor(Math.random() * personaContent.facts.length)];
+        htmlContent = `<div class="focus-ad-replacement focus-fact" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#667eea; text-transform:uppercase; margin-bottom:5px;">${selectedPersona} Fact</div><div style="font-size:14px; line-height:1.4;">${fact}</div></div>`;
+    } else if (type === 'quote') {
+        const quote = personaContent.quotes[Math.floor(Math.random() * personaContent.quotes.length)];
+        htmlContent = `<div class="focus-ad-replacement focus-quote" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#f093fb; text-transform:uppercase; margin-bottom:5px;">Wisdom</div><div style="font-size:14px; font-style:italic;">${quote}</div></div>`;
     } else {
-      stats.neutral++;
+        const headline = personaContent.headlines[Math.floor(Math.random() * personaContent.headlines.length)];
+        htmlContent = `<div class="focus-ad-replacement" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#aaa; text-transform:uppercase; margin-bottom:5px;">Recommended</div><a href="${headline.link}" target="_blank" style="color:#fff; text-decoration:none; font-weight:bold; font-size:14px;">${headline.title}</a></div>`;
     }
+
+    element.innerHTML = htmlContent;
+    element.dataset.focusProcessed = "true";
+    incrementLifetimeStats('hidden', 1);
   }
 
-  function executeFacebookLike(postElement) {
-    const likeButton = postElement.querySelector('[aria-label*="Like"]');
-    if (!likeButton) return false;
+  // --- HANDLERS ---
+  function handleYouTube() {
+    const selectors = ['ytd-rich-item-renderer', 'ytd-compact-video-renderer', 'ytd-video-renderer'];
+    selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(video => {
+            if (processedElements.has(video)) return;
+            processedElements.add(video);
 
-    console.log(`[Focus Feed] ✓ Liking educational Facebook post`);
-    stats.liked++;
-    updateStats();
-    return true;
+            const title = video.querySelector('#video-title')?.textContent.trim();
+            if (title) {
+                const classification = classifier.classify(title);
+                if (classification === 'educational' && Math.random() * 100 < trainingIntensity) {
+                    queueAction({ type: 'youtube-like', element: video });
+                } else if (classification === 'junk') {
+                    replaceWithPreset(video, title);
+                }
+            }
+        });
+    });
   }
 
-  function executeFacebookHide(postElement) {
-    console.log(`[Focus Feed] ✗ Hiding junk Facebook post`);
-    postElement.style.opacity = '0.3';
-    postElement.style.pointerEvents = 'none';
-
-    stats.hidden++;
-    updateStats();
-    return true;
+  function handleX() {
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+    tweets.forEach(tweet => {
+        if (processedElements.has(tweet)) return;
+        processedElements.add(tweet);
+        const textEl = tweet.querySelector('[data-testid="tweetText"]');
+        if (textEl) {
+            const text = textEl.textContent;
+            const classification = classifier.classify(text);
+            if (classification === 'educational') queueAction({ type: 'x-like', element: tweet });
+            else if (classification === 'junk') {
+                 const container = textEl.closest('div[lang]') || textEl.parentElement;
+                 if (container) replaceWithPreset(container, text);
+            }
+        }
+    });
   }
 
-  // INSTAGRAM MODULE
-  function handleInstagram() {
-    const posts = document.querySelectorAll('article[role="presentation"]');
-    posts.forEach(post => processInstagramPost(post));
+  function handleTikTok() {
+     const videos = document.querySelectorAll('[data-e2e="recommend-list-item-container"]');
+     videos.forEach(video => {
+        if (processedElements.has(video)) return;
+        processedElements.add(video);
+        const desc = video.querySelector('[data-e2e="browse-video-desc"]');
+        if (desc) {
+            const classification = classifier.classify(desc.textContent);
+            if (classification === 'educational') queueAction({ type: 'tiktok-like', element: video });
+            else if (classification === 'junk') replaceWithPreset(video, desc.textContent);
+        }
+    });
   }
 
-  function processInstagramPost(postElement) {
-    if (processedElements.has(postElement)) return;
-    processedElements.add(postElement);
-
-    const caption = postElement.querySelector('h1')?.textContent || '';
-    const classification = classifier.classify(caption);
-
-    if (classification === 'educational') {
-      queueAction({
-        type: 'instagram-like',
-        element: postElement
-      });
-    } else if (classification === 'junk') {
-      queueAction({
-        type: 'instagram-hide',
-        element: postElement
-      });
-    } else {
-      stats.neutral++;
-    }
+  // --- ACTIONS ---
+  function executeYouTubeLike(el) {
+    const btn = el.querySelector('#like-button button, button[aria-label*="like"]');
+    if (btn && btn.getAttribute('aria-pressed') !== 'true') { btn.click(); return true; }
+    return false;
+  }
+  function executeXLike(el) {
+    const btn = el.querySelector('[data-testid="like"]');
+    const unlike = el.querySelector('[data-testid="unlike"]');
+    if (btn && !unlike) { btn.click(); return true; }
+    return false;
+  }
+  function executeTikTokLike(el) {
+    const btn = el.querySelector('[data-e2e="like-icon"]');
+    if (btn) { btn.click(); return true; }
+    return false;
   }
 
-  function executeInstagramLike(postElement) {
-    const likeButton = postElement.querySelector('svg[aria-label="Like"]')?.closest('button');
-    if (!likeButton) return false;
-
-    console.log(`[Focus Feed] ✓ Liking educational Instagram post`);
-    stats.liked++;
-    updateStats();
-    return true;
-  }
-
-  function executeInstagramHide(postElement) {
-    console.log(`[Focus Feed] ✗ Hiding junk Instagram post`);
-    postElement.style.opacity = '0.3';
-    postElement.style.pointerEvents = 'none';
-
-    stats.hidden++;
-    updateStats();
-    return true;
-  }
-
-  // RATE LIMITING & ACTION QUEUE
+  // --- QUEUE ---
   function queueAction(action) {
-    if (dailyActionCount >= RATE_LIMITS.dailyActionLimit) {
-      console.log('[Focus Feed] Daily action limit reached');
-      return;
-    }
-
+    if (dailyActionCount >= RATE_LIMITS.dailyActionLimit) return;
     actionQueue.push(action);
   }
 
   function startActionProcessor() {
-    // Clear existing interval to prevent multiple processors
-    if (actionProcessorInterval) {
-      clearInterval(actionProcessorInterval);
-    }
-
+    if (actionProcessorInterval) clearInterval(actionProcessorInterval);
     actionProcessorInterval = setInterval(() => {
-      if (actionQueue.length === 0) return;
-      if (!trainingEnabled) return;
-
+      if (actionQueue.length === 0 || !trainingEnabled) return;
       const now = Date.now();
-      const timeSinceLastAction = now - lastActionTime;
-
-      if (timeSinceLastAction < RATE_LIMITS.minDelayBetweenActions) {
-        return; // Too soon
-      }
+      if (now - lastActionTime < RATE_LIMITS.minDelayBetweenActions) return;
 
       const action = actionQueue.shift();
-      executeAction(action);
-      lastActionTime = now;
-      dailyActionCount++;
-
-      // Update daily stats
-      const today = new Date().toDateString();
-      chrome.storage.sync.set({ dailyStats: { date: today, count: dailyActionCount } });
-
-    }, 2000); // Check every 2 seconds
+      const success = executeAction(action);
+      
+      if (success) {
+          lastActionTime = now;
+          dailyActionCount++;
+          chrome.storage.sync.set({ dailyStats: { date: new Date().toDateString(), count: dailyActionCount } });
+          incrementLifetimeStats('liked', 1);
+      }
+    }, 200);
   }
 
   function executeAction(action) {
     try {
-      if (action.type === 'youtube-like') {
-        executeYouTubeLike(action.element);
-      } else if (action.type === 'youtube-hide') {
-        executeYouTubeHide(action.element);
-      } else if (action.type === 'tiktok-like') {
-        executeTikTokLike(action.element);
-      } else if (action.type === 'tiktok-hide') {
-        executeTikTokHide(action.element);
-      } else if (action.type === 'facebook-like') {
-        executeFacebookLike(action.element);
-      } else if (action.type === 'facebook-hide') {
-        executeFacebookHide(action.element);
-      } else if (action.type === 'instagram-like') {
-        executeInstagramLike(action.element);
-      } else if (action.type === 'instagram-hide') {
-        executeInstagramHide(action.element);
-      }
-    } catch (error) {
-      console.error('[Focus Feed] Action execution error:', error);
-    }
+        if (action.type === 'youtube-like') return executeYouTubeLike(action.element);
+        if (action.type === 'x-like') return executeXLike(action.element);
+        if (action.type === 'tiktok-like') return executeTikTokLike(action.element);
+    } catch(e) { console.error(e); }
+    return false;
   }
 
-  function updateStats() {
-    chrome.storage.local.set({
-      sessionStats: {
-        liked: stats.liked,
-        hidden: stats.hidden,
-        neutral: stats.neutral,
-        timestamp: Date.now()
-      }
+  function incrementLifetimeStats(type, amount) {
+    chrome.storage.sync.get(['lifetimeStats'], (res) => {
+        const stats = res.lifetimeStats || { liked: 0, hidden: 0 };
+        stats[type] = (stats[type] || 0) + (amount || 0);
+        chrome.storage.sync.set({ lifetimeStats: stats });
     });
     updateDebugPanel();
   }
 
-  // OBSERVER
-  let observerTimeout = null;
-
   function startObserver() {
-    observer = new MutationObserver(() => {
-      // Debounce: clear previous timeout and create new one
-      if (observerTimeout) {
-        clearTimeout(observerTimeout);
-      }
-
-      observerTimeout = setTimeout(() => {
-        if (!trainingEnabled) return;
-
-        if (hostname.includes('youtube.com')) {
-          handleYouTube();
-        } else if (hostname.includes('tiktok.com')) {
-          handleTikTok();
-        } else if (hostname.includes('facebook.com')) {
-          handleFacebook();
-        } else if (hostname.includes('instagram.com')) {
-          handleInstagram();
-        }
-
-        // Limit processedElements Set size to prevent memory bloat
-        if (processedElements.size > 500) {
-          processedElements.clear();
-        }
-      }, 1000);
+    observer = new MutationObserver((mutations) => {
+        if (mutations.some(m => m.addedNodes.length)) runScan();
     });
 
     observer.observe(document.body, {
@@ -708,9 +541,4 @@
   } else {
     init();
   }
-
-  window.addEventListener('popstate', () => {
-    processedElements.clear();
-    setTimeout(init, 500);
-  });
 })();
