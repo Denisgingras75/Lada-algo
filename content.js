@@ -4,6 +4,7 @@
   let trainingEnabled = true;
   let selectedPersona = 'common-sense';
   let trainingIntensity = 80;
+  let filterMode = 'smart'; // NEW: 'smart' or 'mega'
   let processedElements = new Set();
   let stats = { liked: 0, hidden: 0, neutral: 0 };
   let debugPanel = null;
@@ -92,12 +93,13 @@
   }
 
   // Initialize
-  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity'], (result) => {
+  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'filterMode'], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
     selectedPersona = result.selectedPersona || 'common-sense';
     trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
+    filterMode = result.filterMode || 'smart'; // Default to SMART MODE
 
-    console.log(`[Focus Feed] Loaded - Persona: ${selectedPersona}, Intensity: ${trainingIntensity}%`);
+    console.log(`[Focus Feed] Loaded - Mode: ${filterMode.toUpperCase()}, Persona: ${selectedPersona}, Intensity: ${trainingIntensity}%`);
 
     init();
   });
@@ -106,6 +108,11 @@
     if (changes.focusEnabled) trainingEnabled = changes.focusEnabled.newValue;
     if (changes.selectedPersona) selectedPersona = changes.selectedPersona.newValue;
     if (changes.trainingIntensity) trainingIntensity = changes.trainingIntensity.newValue;
+    if (changes.filterMode) {
+      filterMode = changes.filterMode.newValue;
+      console.log(`[Focus Feed] Mode changed to: ${filterMode.toUpperCase()}`);
+      updateDebugPanel(`Switched to ${filterMode.toUpperCase()} MODE`);
+    }
   });
 
   function init() {
@@ -147,13 +154,29 @@
 
     debugPanel.innerHTML = `
       <div style="font-weight: bold; margin-bottom: 10px; font-size: 14px;">🎯 Focus Feed Active</div>
-      <div style="margin-bottom: 5px;">Persona: <span id="ff-persona">${selectedPersona}</span></div>
-      <div style="margin-bottom: 5px;">Intensity: <span id="ff-intensity">${trainingIntensity}%</span></div>
+      <div style="margin-bottom: 5px;">
+        <span style="font-size: 12px; font-weight: bold; color: #4ade80;">Mode: <span id="ff-mode">${filterMode.toUpperCase()}</span></span>
+      </div>
+      <div style="margin-bottom: 5px; font-size: 11px;">Persona: <span id="ff-persona">${selectedPersona}</span></div>
       <div style="margin-bottom: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
         <div style="margin-bottom: 3px;">✅ Educational: <span id="ff-educational">0</span></div>
         <div style="margin-bottom: 3px;">❌ Junk: <span id="ff-junk">0</span></div>
         <div style="margin-bottom: 3px;">○ Neutral: <span id="ff-neutral">0</span></div>
       </div>
+      <button id="ff-mode-toggle" style="
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        background: ${filterMode === 'smart' ? 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      ">${filterMode === 'smart' ? '🧠 SMART MODE (ON)' : '💥 MEGA MODE (ON)'}</button>
+      <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">${filterMode === 'smart' ? 'Removes junk, keeps your interests' : 'Nuclear option - floods everything'}</div>
       <button id="ff-turbo-btn" style="
         width: 100%;
         padding: 10px;
@@ -167,7 +190,7 @@
         font-size: 13px;
         box-shadow: 0 2px 8px rgba(255,75,87,0.4);
       ">🚀 MEGA TURBO TRAIN</button>
-      <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">Trains ALL platforms at once!</div>
+      <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">Weekly reset - trains ALL platforms!</div>
       <div id="ff-progress" style="margin-top: 10px; display: none;">
         <div style="background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
           <div id="ff-progress-bar" style="background: #4ade80; height: 100%; width: 0%; transition: width 0.3s;"></div>
@@ -180,8 +203,41 @@
     document.body.appendChild(debugPanel);
     console.log('[Focus Feed] ✓ Debug panel created');
 
+    // Add mode toggle button click handler
+    document.getElementById('ff-mode-toggle').addEventListener('click', toggleFilterMode);
+
     // Add turbo button click handler
     document.getElementById('ff-turbo-btn').addEventListener('click', activateTurboMode);
+  }
+
+  // Toggle between SMART and MEGA modes
+  function toggleFilterMode() {
+    const newMode = filterMode === 'smart' ? 'mega' : 'smart';
+    filterMode = newMode;
+
+    // Save to storage
+    chrome.storage.sync.set({ filterMode: newMode });
+
+    // Update UI
+    const modeEl = document.getElementById('ff-mode');
+    const modeBtn = document.getElementById('ff-mode-toggle');
+    const modeDesc = modeBtn.nextElementSibling;
+
+    if (modeEl) modeEl.textContent = newMode.toUpperCase();
+    if (modeBtn) {
+      if (newMode === 'smart') {
+        modeBtn.style.background = 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)';
+        modeBtn.textContent = '🧠 SMART MODE (ON)';
+        if (modeDesc) modeDesc.textContent = 'Removes junk, keeps your interests';
+      } else {
+        modeBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        modeBtn.textContent = '💥 MEGA MODE (ON)';
+        if (modeDesc) modeDesc.textContent = 'Nuclear option - floods everything';
+      }
+    }
+
+    console.log(`[Focus Feed] Switched to ${newMode.toUpperCase()} MODE`);
+    updateDebugPanel(`✓ Switched to ${newMode.toUpperCase()} MODE`);
   }
 
   function updateDebugPanel(action = null) {
@@ -224,25 +280,78 @@
     const channel = channelElement ? channelElement.textContent.trim() : '';
     const classification = classifyContent(title, channel);
 
-    console.log(`[Focus Feed] "${title}" → ${classification}`);
+    console.log(`[Focus Feed] "${title}" → ${classification} (${filterMode} mode)`);
 
-    if (classification === 'educational' && trainingIntensity >= 30) {
-      markEducational(videoElement, title);
-      stats.liked++;
-      updateDebugPanel(`✅ Found: ${title.substring(0, 40)}...`);
-    } else if (classification === 'junk' && trainingIntensity >= 70) {
-      hideJunk(videoElement, title);
-      stats.hidden++;
-      updateDebugPanel(`❌ Hiding: ${title.substring(0, 40)}...`);
-    } else {
-      stats.neutral++;
-      updateDebugPanel(`Checked: ${title.substring(0, 40)}...`);
+    // SMART MODE: Focus on removing junk, suggest educational, leave neutral alone
+    if (filterMode === 'smart') {
+      if (classification === 'junk') {
+        // ALWAYS hide junk in SMART MODE (no intensity check)
+        hideJunk(videoElement, title);
+        stats.hidden++;
+        updateDebugPanel(`❌ Removed junk: ${title.substring(0, 40)}...`);
+      } else if (classification === 'educational') {
+        // Gently suggest educational (light border, no auto-like)
+        suggestEducational(videoElement, title);
+        stats.liked++;
+        updateDebugPanel(`✅ Suggested: ${title.substring(0, 40)}...`);
+      } else {
+        // Neutral = user's interests, let it through
+        stats.neutral++;
+        updateDebugPanel(`○ Passed: ${title.substring(0, 40)}...`);
+      }
+    }
+    // MEGA MODE: Nuclear option - force educational, hide junk aggressively
+    else if (filterMode === 'mega') {
+      if (classification === 'educational' && trainingIntensity >= 30) {
+        markEducational(videoElement, title);
+        stats.liked++;
+        updateDebugPanel(`✅ Training: ${title.substring(0, 40)}...`);
+      } else if (classification === 'junk' && trainingIntensity >= 70) {
+        hideJunk(videoElement, title);
+        stats.hidden++;
+        updateDebugPanel(`❌ Hiding: ${title.substring(0, 40)}...`);
+      } else {
+        stats.neutral++;
+        updateDebugPanel(`Checked: ${title.substring(0, 40)}...`);
+      }
     }
 
     // Update stats storage
     chrome.storage.local.set({ sessionStats: stats });
   }
 
+  // SMART MODE: Gentle educational suggestion (no auto-like)
+  function suggestEducational(videoElement, title) {
+    // Light green border (less aggressive than MEGA mode)
+    videoElement.style.border = '1px solid rgba(74, 222, 128, 0.5)';
+    videoElement.style.borderRadius = '8px';
+
+    // Add subtle badge
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(74, 222, 128, 0.9);
+      color: #000;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      z-index: 100;
+    `;
+    badge.textContent = '📚 Educational';
+
+    const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
+    if (thumbnail) {
+      thumbnail.style.position = 'relative';
+      thumbnail.appendChild(badge);
+    }
+
+    // NO auto-like in SMART MODE - just suggest
+  }
+
+  // MEGA MODE: Aggressive educational marking (with auto-like)
   function markEducational(videoElement, title) {
     videoElement.style.border = '2px solid #4ade80';
     videoElement.style.borderRadius = '8px';
