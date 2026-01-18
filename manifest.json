@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Focus Feed - Algorithm Trainer",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "description": "Train social media algorithms to show educational content using AI-powered persona classification",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
@@ -18,6 +19,9 @@
   ],
   "action": {
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

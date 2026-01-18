@@ -26,6 +26,39 @@
   let actionProcessorInterval = null;
   let debugPanel = null;
 
+  // Listen for messages from background script
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'likeCurrentVideo') {
+      likeCurrentVideoPage();
+      sendResponse({ success: true });
+    }
+    return true;
+  });
+
+  // Function to like video when on video watch page
+  function likeCurrentVideoPage() {
+    try {
+      // Find like button on video page
+      const likeButton = document.querySelector(
+        'like-button-view-model button[aria-label*="like"], ' +
+        'button[aria-label="Like this video"], ' +
+        '#segmented-like-button button'
+      );
+
+      if (likeButton && likeButton.getAttribute('aria-pressed') !== 'true') {
+        console.log('[Focus Feed] Liking video:', document.title);
+        likeButton.click();
+        return true;
+      } else {
+        console.log('[Focus Feed] Like button not found or already liked');
+        return false;
+      }
+    } catch (error) {
+      console.error('[Focus Feed] Error liking video:', error);
+      return false;
+    }
+  }
+
   // --- INIT ---
   chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats', 'lifetimeStats'], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
@@ -194,13 +227,20 @@
     if (!videoUrl) return false;
 
     const title = titleElement.textContent.trim();
-    console.log(`[Focus Feed] ✓ Marking educational: "${title}"`);
+    console.log(`[Focus Feed] ✓ Opening tab to like: "${title}"`);
 
-    // Strategy: Add visual indicator that this was classified as educational
-    // YouTube doesn't expose like buttons on feed thumbnails, so we can't directly like
-    // The user will naturally click and watch these videos, which trains the algorithm
+    // Send message to background script to open video in tab and like it
+    chrome.runtime.sendMessage({
+      action: 'likeVideo',
+      videoUrl: videoUrl,
+      title: title
+    }, (response) => {
+      if (response && response.success) {
+        console.log(`[Focus Feed] Queued for liking: ${title}`);
+      }
+    });
 
-    // Add a green border to indicate educational content
+    // Add visual indicator
     videoElement.style.border = '2px solid #4ade80';
     videoElement.style.borderRadius = '8px';
 
@@ -219,7 +259,7 @@
       z-index: 100;
       pointer-events: none;
     `;
-    badge.textContent = '✓ Educational';
+    badge.textContent = '✓ Will Like';
 
     const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
     if (thumbnail) {
