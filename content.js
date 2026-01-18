@@ -1,30 +1,14 @@
 (function() {
   'use strict';
 
-  // --- SAFETY CHECK ---
-  if (typeof FOCUS_PRESETS === 'undefined') {
-    console.error("[Focus Feed] ❌ CRITICAL ERROR: presets.js is missing or not loaded. Replacements will fail.");
-  }
-  if (typeof ContentClassifier === 'undefined') {
-    console.error("[Focus Feed] ❌ CRITICAL ERROR: classifier.js is missing or not loaded. Detection will fail.");
-  }
-
-  // --- CONFIG ---
   let trainingEnabled = true;
   let selectedPersona = 'polymath';
   let trainingIntensity = 80;
-  let classifier = null;
-  let observer = null;
   let processedElements = new Set();
-  const hostname = window.location.hostname;
-  
-  // Rate limits
-  const RATE_LIMITS = { maxActionsPerMinute: 60, minDelayBetweenActions: 500, dailyActionLimit: 2000 };
-  let actionQueue = [];
-  let lastActionTime = 0;
-  let dailyActionCount = 0;
-  let actionProcessorInterval = null;
+  let stats = { liked: 0, hidden: 0, neutral: 0 };
   let debugPanel = null;
+  let observer = null;
+  const hostname = window.location.hostname;
 
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -38,7 +22,6 @@
   // Function to like video when on video watch page
   function likeCurrentVideoPage() {
     try {
-      // Find like button on video page
       const likeButton = document.querySelector(
         'like-button-view-model button[aria-label*="like"], ' +
         'button[aria-label="Like this video"], ' +
@@ -46,66 +29,53 @@
       );
 
       if (likeButton && likeButton.getAttribute('aria-pressed') !== 'true') {
-        console.log('[Focus Feed] Liking video:', document.title);
+        console.log('[Focus Feed] ✓ Liking video:', document.title);
         likeButton.click();
         return true;
-      } else {
-        console.log('[Focus Feed] Like button not found or already liked');
-        return false;
       }
+      return false;
     } catch (error) {
       console.error('[Focus Feed] Error liking video:', error);
       return false;
     }
   }
 
-  // --- INIT ---
-  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats', 'lifetimeStats'], (result) => {
+  // Initialize
+  chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity'], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
     selectedPersona = result.selectedPersona || 'polymath';
     trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
-    
-    // Init Classifier
-    if (typeof ContentClassifier !== 'undefined') {
-        classifier = new ContentClassifier(selectedPersona);
-    }
-    
-    // Ensure Stats Exist
-    if (!result.lifetimeStats) {
-        chrome.storage.sync.set({ lifetimeStats: { liked: 0, hidden: 0 } });
-    }
+
+    console.log(`[Focus Feed] Loaded - Persona: ${selectedPersona}, Intensity: ${trainingIntensity}%`);
 
     init();
   });
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.focusEnabled) trainingEnabled = changes.focusEnabled.newValue;
-    if (changes.selectedPersona) {
-        selectedPersona = changes.selectedPersona.newValue;
-        if (typeof ContentClassifier !== 'undefined') classifier = new ContentClassifier(selectedPersona);
-    }
+    if (changes.selectedPersona) selectedPersona = changes.selectedPersona.newValue;
+    if (changes.trainingIntensity) trainingIntensity = changes.trainingIntensity.newValue;
   });
 
   function init() {
-    if (!trainingEnabled) return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('focus_mode') === 'turbo') {
-        console.log(`[Focus Feed] 👻 GHOST MODE ACTIVE`);
-        runTurboSequence();
-        return;
+    if (!trainingEnabled) {
+      console.log('[Focus Feed] Training disabled');
+      return;
     }
 
-    console.log(`[Focus Feed] Active: ${selectedPersona}`);
-    runScan();
-    startObserver();
-    startActionProcessor();
+    console.log(`[Focus Feed] 🎯 Active - ${selectedPersona} persona`);
+
     createDebugPanel();
+
+    if (hostname.includes('youtube.com')) {
+      handleYouTube();
+      startObserver();
+    }
   }
 
-  // Debug panel to show what's happening
+  // Debug panel
   function createDebugPanel() {
-    if (debugPanel) return; // Already exists
+    if (debugPanel) return;
 
     debugPanel = document.createElement('div');
     debugPanel.id = 'focus-feed-debug';
@@ -137,49 +107,34 @@
     `;
 
     document.body.appendChild(debugPanel);
+    console.log('[Focus Feed] ✓ Debug panel created');
   }
 
   function updateDebugPanel(action = null) {
     if (!debugPanel) return;
 
-    document.getElementById('ff-educational').textContent = stats.liked;
-    document.getElementById('ff-junk').textContent = stats.hidden;
-    document.getElementById('ff-neutral').textContent = stats.neutral;
+    const eduEl = document.getElementById('ff-educational');
+    const junkEl = document.getElementById('ff-junk');
+    const neutralEl = document.getElementById('ff-neutral');
+
+    if (eduEl) eduEl.textContent = stats.liked;
+    if (junkEl) junkEl.textContent = stats.hidden;
+    if (neutralEl) neutralEl.textContent = stats.neutral;
 
     if (action) {
       const lastActionEl = document.getElementById('ff-last-action');
-      lastActionEl.textContent = action;
-      lastActionEl.style.animation = 'none';
-      setTimeout(() => {
-        lastActionEl.style.animation = 'pulse 0.5s';
-      }, 10);
+      if (lastActionEl) lastActionEl.textContent = action;
     }
   }
 
-  // --- TURBO SEQUENCE ---
-  function runTurboSequence() {
-     let attempts = 0;
-     const interval = setInterval(() => {
-         const results = document.querySelectorAll('ytd-video-renderer');
-         if (results.length > 0) {
-             clearInterval(interval);
-             let actions = 0;
-             for (let i = 0; i < Math.min(results.length, 3); i++) {
-                 const video = results[i];
-                 const likeBtn = video.querySelector('#like-button button, button[aria-label*="like"]');
-                 if (likeBtn) { likeBtn.click(); actions++; }
-                 
-                 const subBtn = video.querySelector('ytd-subscribe-button-renderer button');
-                 if (subBtn && !subBtn.hasAttribute('subscribed')) { subBtn.click(); actions++; }
-             }
-             
-             if (actions > 0) incrementLifetimeStats('liked', actions);
+  // YOUTUBE MODULE
+  function handleYouTube() {
+    console.log('[Focus Feed] Scanning YouTube...');
 
-             setTimeout(() => { window.close(); }, 2500);
-         }
-         attempts++;
-         if (attempts > 20) { clearInterval(interval); window.close(); }
-     }, 500);
+    const videos = document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer');
+    console.log(`[Focus Feed] Found ${videos.length} videos`);
+
+    videos.forEach(video => processYouTubeVideo(video));
   }
 
   function processYouTubeVideo(videoElement) {
@@ -193,56 +148,40 @@
 
     const title = titleElement.textContent.trim();
     const channel = channelElement ? channelElement.textContent.trim() : '';
-    const classification = classifier.classify(`${title} ${channel}`, channel);
+    const classification = classifyContent(title, channel);
 
-    // Respect training intensity
+    console.log(`[Focus Feed] "${title}" → ${classification}`);
+
     if (classification === 'educational' && trainingIntensity >= 30) {
-      queueAction({
-        type: 'youtube-like',
-        element: videoElement,
-        title,
-        channel
-      });
+      markEducational(videoElement, title);
+      stats.liked++;
       updateDebugPanel(`✅ Found: ${title.substring(0, 40)}...`);
     } else if (classification === 'junk' && trainingIntensity >= 70) {
-      // Only hide junk at 70%+ intensity
-      queueAction({
-        type: 'youtube-hide',
-        element: videoElement,
-        title,
-        channel
-      });
+      hideJunk(videoElement, title);
+      stats.hidden++;
       updateDebugPanel(`❌ Hiding: ${title.substring(0, 40)}...`);
     } else {
       stats.neutral++;
       updateDebugPanel(`Checked: ${title.substring(0, 40)}...`);
     }
+
+    // Update stats storage
+    chrome.storage.local.set({ sessionStats: stats });
   }
 
-  function executeYouTubeLike(videoElement) {
-    const titleElement = videoElement.querySelector('#video-title');
-    if (!titleElement) return false;
-
-    const videoUrl = titleElement.getAttribute('href');
-    if (!videoUrl) return false;
-
-    const title = titleElement.textContent.trim();
-    console.log(`[Focus Feed] ✓ Opening tab to like: "${title}"`);
-
-    // Send message to background script to open video in tab and like it
-    chrome.runtime.sendMessage({
-      action: 'likeVideo',
-      videoUrl: videoUrl,
-      title: title
-    }, (response) => {
-      if (response && response.success) {
-        console.log(`[Focus Feed] Queued for liking: ${title}`);
-      }
-    });
-
-    // Add visual indicator
+  function markEducational(videoElement, title) {
     videoElement.style.border = '2px solid #4ade80';
     videoElement.style.borderRadius = '8px';
+
+    const videoUrl = videoElement.querySelector('#video-title')?.getAttribute('href');
+    if (videoUrl) {
+      // Send to background to open and like
+      chrome.runtime.sendMessage({
+        action: 'likeVideo',
+        videoUrl: videoUrl,
+        title: title
+      });
+    }
 
     // Add badge
     const badge = document.createElement('div');
@@ -257,328 +196,125 @@
       font-size: 11px;
       font-weight: bold;
       z-index: 100;
-      pointer-events: none;
     `;
-    badge.textContent = '✓ Will Like';
+    badge.textContent = '✓ Educational';
 
     const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
     if (thumbnail) {
       thumbnail.style.position = 'relative';
       thumbnail.appendChild(badge);
     }
-
-    stats.liked++;
-    updateStats();
-    return true;
   }
 
-  function executeYouTubeHide(videoElement) {
-    // Find the 3-dot menu button
-    const menuButton = videoElement.querySelector('button[aria-label="Action menu"], button#button[aria-label*="menu"], ytd-menu-renderer button');
-    if (!menuButton) {
-      console.log('[Focus Feed] ⚠️ Menu button not found');
-      return false;
-    }
+  function hideJunk(videoElement, title) {
+    const menuButton = videoElement.querySelector('button[aria-label="Action menu"], button#button[aria-label*="menu"]');
 
-    const titleElement = videoElement.querySelector('#video-title');
-    const title = titleElement ? titleElement.textContent.trim() : 'Unknown';
-    console.log(`[Focus Feed] ✗ Hiding junk: "${title}"`);
+    if (menuButton) {
+      try {
+        menuButton.click();
 
-    try {
-      // Click the menu button
-      menuButton.click();
+        setTimeout(() => {
+          const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-listbox ytd-menu-service-item-renderer');
 
-      // Wait for menu to appear, then click "Not interested"
-      setTimeout(() => {
-        // Look for "Not interested" option in the popup menu
-        const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-listbox ytd-menu-service-item-renderer');
-
-        for (let item of menuItems) {
-          const text = item.textContent.toLowerCase();
-          if (text.includes('not interested') || text.includes('don\'t recommend')) {
-            console.log('[Focus Feed] ✓ Clicking "Not interested"');
-            item.click();
-
-            // Hide the video visually too
-            videoElement.style.transition = 'opacity 0.5s';
-            videoElement.style.opacity = '0.2';
-            videoElement.style.filter = 'grayscale(100%)';
-
-            stats.hidden++;
-            updateStats();
-            return true;
+          for (let item of menuItems) {
+            const text = item.textContent.toLowerCase();
+            if (text.includes('not interested') || text.includes('don\'t recommend')) {
+              console.log(`[Focus Feed] ✓ Clicking "Not interested" on: ${title}`);
+              item.click();
+              break;
+            }
           }
-        }
-
-        // If we couldn't find "Not interested", just hide visually
-        console.log('[Focus Feed] ⚠️ Could not find "Not interested" option, hiding visually');
-        videoElement.style.opacity = '0.2';
-        videoElement.style.filter = 'grayscale(100%)';
-        videoElement.style.pointerEvents = 'none';
-
-        stats.hidden++;
-        updateStats();
-      }, 500); // Wait 500ms for menu to render
-
-      return true;
-    } catch (error) {
-      console.error('[Focus Feed] Error hiding video:', error);
-      return false;
-    }
-  }
-
-  // TIKTOK MODULE
-  function handleTikTok() {
-    const videos = document.querySelectorAll('[data-e2e="recommend-list-item-container"]');
-    videos.forEach(video => processTikTokVideo(video));
-  }
-
-  function processTikTokVideo(videoElement) {
-    if (processedElements.has(videoElement)) return;
-    processedElements.add(videoElement);
-
-    const captionElement = videoElement.querySelector('[data-e2e="browse-video-desc"]');
-    if (!captionElement) return;
-
-    const caption = captionElement.textContent.trim();
-    const classification = classifier.classify(caption);
-
-    if (classification === 'educational') {
-      queueAction({
-        type: 'tiktok-like',
-        element: videoElement,
-        caption
-      });
-    } else if (classification === 'junk') {
-      queueAction({
-        type: 'tiktok-hide',
-        element: videoElement,
-        caption
-      });
-    } else {
-      stats.neutral++;
-    }
-
-    const personaContent = FOCUS_PRESETS[selectedPersona];
-    const types = ['fact', 'quote', 'headline'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    let htmlContent = '';
-    
-    if (type === 'fact') {
-        const fact = personaContent.facts[Math.floor(Math.random() * personaContent.facts.length)];
-        htmlContent = `<div class="focus-ad-replacement focus-fact" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#667eea; text-transform:uppercase; margin-bottom:5px;">${selectedPersona} Fact</div><div style="font-size:14px; line-height:1.4;">${fact}</div></div>`;
-    } else if (type === 'quote') {
-        const quote = personaContent.quotes[Math.floor(Math.random() * personaContent.quotes.length)];
-        htmlContent = `<div class="focus-ad-replacement focus-quote" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#f093fb; text-transform:uppercase; margin-bottom:5px;">Wisdom</div><div style="font-size:14px; font-style:italic;">${quote}</div></div>`;
-    } else {
-        const headline = personaContent.headlines[Math.floor(Math.random() * personaContent.headlines.length)];
-        htmlContent = `<div class="focus-ad-replacement" style="padding:20px; border:1px solid #333; border-radius:8px; background:#111; color:#eee; height:100%; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:10px; color:#aaa; text-transform:uppercase; margin-bottom:5px;">Recommended</div><a href="${headline.link}" target="_blank" style="color:#fff; text-decoration:none; font-weight:bold; font-size:14px;">${headline.title}</a></div>`;
-    }
-
-    element.innerHTML = htmlContent;
-    element.dataset.focusProcessed = "true";
-    incrementLifetimeStats('hidden', 1);
-  }
-
-  // --- HANDLERS ---
-  function handleYouTube() {
-    const selectors = ['ytd-rich-item-renderer', 'ytd-compact-video-renderer', 'ytd-video-renderer'];
-    selectors.forEach(sel => {
-        document.querySelectorAll(sel).forEach(video => {
-            if (processedElements.has(video)) return;
-            processedElements.add(video);
-
-            const title = video.querySelector('#video-title')?.textContent.trim();
-            if (title) {
-                const classification = classifier.classify(title);
-                if (classification === 'educational' && Math.random() * 100 < trainingIntensity) {
-                    queueAction({ type: 'youtube-like', element: video });
-                } else if (classification === 'junk') {
-                    replaceWithPreset(video, title);
-                }
-            }
-        });
-    });
-  }
-
-  function handleX() {
-    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-    tweets.forEach(tweet => {
-        if (processedElements.has(tweet)) return;
-        processedElements.add(tweet);
-        const textEl = tweet.querySelector('[data-testid="tweetText"]');
-        if (textEl) {
-            const text = textEl.textContent;
-            const classification = classifier.classify(text);
-            if (classification === 'educational') queueAction({ type: 'x-like', element: tweet });
-            else if (classification === 'junk') {
-                 const container = textEl.closest('div[lang]') || textEl.parentElement;
-                 if (container) replaceWithPreset(container, text);
-            }
-        }
-    });
-  }
-
-  function handleTikTok() {
-     const videos = document.querySelectorAll('[data-e2e="recommend-list-item-container"]');
-     videos.forEach(video => {
-        if (processedElements.has(video)) return;
-        processedElements.add(video);
-        const desc = video.querySelector('[data-e2e="browse-video-desc"]');
-        if (desc) {
-            const classification = classifier.classify(desc.textContent);
-            if (classification === 'educational') queueAction({ type: 'tiktok-like', element: video });
-            else if (classification === 'junk') replaceWithPreset(video, desc.textContent);
-        }
-    });
-  }
-
-  // --- ACTIONS ---
-  function executeYouTubeLike(el) {
-    const btn = el.querySelector('#like-button button, button[aria-label*="like"]');
-    if (btn && btn.getAttribute('aria-pressed') !== 'true') { btn.click(); return true; }
-    return false;
-  }
-  function executeXLike(el) {
-    const btn = el.querySelector('[data-testid="like"]');
-    const unlike = el.querySelector('[data-testid="unlike"]');
-    if (btn && !unlike) { btn.click(); return true; }
-    return false;
-  }
-  function executeTikTokLike(el) {
-    const btn = el.querySelector('[data-e2e="like-icon"]');
-    if (btn) { btn.click(); return true; }
-    return false;
-  }
-
-  // --- QUEUE ---
-  function queueAction(action) {
-    if (dailyActionCount >= RATE_LIMITS.dailyActionLimit) return;
-    actionQueue.push(action);
-  }
-
-  function startActionProcessor() {
-    if (actionProcessorInterval) clearInterval(actionProcessorInterval);
-    actionProcessorInterval = setInterval(() => {
-      if (actionQueue.length === 0 || !trainingEnabled) return;
-      const now = Date.now();
-      if (now - lastActionTime < RATE_LIMITS.minDelayBetweenActions) return;
-
-      const action = actionQueue.shift();
-      const success = executeAction(action);
-      
-      if (success) {
-          lastActionTime = now;
-          dailyActionCount++;
-          chrome.storage.sync.set({ dailyStats: { date: new Date().toDateString(), count: dailyActionCount } });
-          incrementLifetimeStats('liked', 1);
+        }, 300);
+      } catch (error) {
+        console.error('[Focus Feed] Error hiding video:', error);
       }
-    }, 200);
+    }
+
+    // Visual hiding
+    videoElement.style.transition = 'opacity 0.5s';
+    videoElement.style.opacity = '0.2';
+    videoElement.style.filter = 'grayscale(100%)';
   }
 
-  function executeAction(action) {
-    try {
-        if (action.type === 'youtube-like') return executeYouTubeLike(action.element);
-        if (action.type === 'x-like') return executeXLike(action.element);
-        if (action.type === 'tiktok-like') return executeTikTokLike(action.element);
-    } catch(e) { console.error(e); }
-    return false;
+  function classifyContent(title, channel) {
+    const text = `${title} ${channel}`.toLowerCase();
+
+    const rules = getPersonaRules(selectedPersona);
+
+    // Check educational keywords
+    for (let keyword of rules.educational) {
+      if (text.includes(keyword.toLowerCase())) {
+        return 'educational';
+      }
+    }
+
+    // Check junk keywords
+    for (let keyword of rules.junk) {
+      if (text.includes(keyword.toLowerCase())) {
+        return 'junk';
+      }
+    }
+
+    return 'neutral';
   }
 
-  function incrementLifetimeStats(type, amount) {
-    chrome.storage.sync.get(['lifetimeStats'], (res) => {
-        const stats = res.lifetimeStats || { liked: 0, hidden: 0 };
-        stats[type] = (stats[type] || 0) + (amount || 0);
-        chrome.storage.sync.set({ lifetimeStats: stats });
-    });
-    updateDebugPanel();
+  function getPersonaRules(persona) {
+    const allRules = {
+      polymath: {
+        educational: [
+          'MIT', 'Stanford', 'Harvard', 'Yale', 'Berkeley', 'Oxford', 'Cambridge',
+          'Khan Academy', 'TED', 'Crash Course', 'Veritasium', 'Kurzgesagt',
+          'SmarterEveryDay', 'Vsauce', '3Blue1Brown', 'Numberphile',
+          'lecture', 'course', 'tutorial', 'explained', 'documentary', 'science',
+          'learn', 'education', 'study', 'lesson', 'guide', 'how to',
+          'physics', 'mathematics', 'chemistry', 'biology', 'history', 'philosophy',
+          'engineering', 'programming', 'research'
+        ],
+        junk: [
+          'SHOCKING', 'UNBELIEVABLE', 'WON\'T BELIEVE', 'YOU WON\'T', 'INSANE',
+          'MIND BLOWING', 'GONE WRONG', 'GONE SEXUAL',
+          'drama', 'exposed', 'cancelled', 'beef', 'cringe', 'roast',
+          'flat earth', 'conspiracy', 'clickbait', 'prank', 'challenge'
+        ]
+      },
+      engineer: {
+        educational: ['engineering', 'coding', 'programming', 'tutorial', 'Python', 'JavaScript', 'CS50', 'algorithm', 'database'],
+        junk: ['SHOCKED', 'drama', 'exposed', 'GONE WRONG', 'clickbait']
+      },
+      strategist: {
+        educational: ['business', 'strategy', 'finance', 'Y Combinator', 'Bloomberg', 'Warren Buffett', 'startup', 'economics'],
+        junk: ['get rich quick', 'EASY MONEY', 'SECRET METHOD', 'exposed', 'drama']
+      }
+    };
+
+    return allRules[persona] || allRules.polymath;
   }
 
+  // Observer for new videos
+  let observerTimeout = null;
   function startObserver() {
-    observer = new MutationObserver((mutations) => {
-        if (mutations.some(m => m.addedNodes.length)) runScan();
+    if (observer) observer.disconnect();
+
+    observer = new MutationObserver(() => {
+      clearTimeout(observerTimeout);
+      observerTimeout = setTimeout(() => {
+        handleYouTube();
+      }, 1000);
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    console.log('[Focus Feed] ✓ Observer started');
   }
 
-  // CLASSIFIER RULES (inline)
-  function getClassifierRules() {
-    return {
-      polymath: {
-        educational: [
-          // Universities & Institutions
-          'MIT', 'Stanford', 'Harvard', 'Yale', 'Berkeley', 'Oxford', 'Cambridge',
-          // Educational Channels
-          'Khan Academy', 'TED', 'Crash Course', 'Veritasium', 'Kurzgesagt',
-          'SmarterEveryDay', 'Vsauce', '3Blue1Brown', 'Numberphile',
-          // Content Types
-          'lecture', 'course', 'tutorial', 'explained', 'documentary', 'science',
-          'learn', 'education', 'study', 'lesson', 'guide', 'how to', 'introduction',
-          'review', 'analysis', 'breakdown', 'deep dive', 'masterclass',
-          // Subject Matter
-          'physics', 'mathematics', 'chemistry', 'biology', 'history', 'philosophy',
-          'engineering', 'programming', 'coding', 'research', 'theory'
-        ],
-        junk: [
-          // Clickbait
-          'SHOCKING', 'UNBELIEVABLE', 'WON\'T BELIEVE', 'YOU WON\'T', 'INSANE',
-          'MIND BLOWING', 'GONE WRONG', 'GONE SEXUAL',
-          // Drama
-          'drama', 'exposed', 'cancelled', 'beef', 'diss track', 'tea', 'shade',
-          'cringe', 'roast', 'destroyed', 'react',
-          // Misinformation
-          'flat earth', 'conspiracy', 'illuminati', 'fake', 'hoax',
-          // Low quality
-          'clickbait', 'vlog', 'prank', 'challenge', '24 hours', 'vs', 'fortnite'
-        ]
-      },
-      engineer: {
-        educational: ['engineering', 'coding', 'programming', 'tutorial', 'Python', 'JavaScript', 'CS50', 'ThePrimeagen', 'Fireship'],
-        junk: ['SHOCKED', 'drama', 'exposed', 'GONE WRONG', 'clickbait']
-      },
-      strategist: {
-        educational: ['business', 'strategy', 'finance', 'Y Combinator', 'Bloomberg', 'Warren Buffett', 'startup', 'case study'],
-        junk: ['get rich quick', 'EASY MONEY', 'SECRET METHOD', 'exposed', 'drama']
-      },
-      stoic: {
-        educational: ['stoicism', 'philosophy', 'meditation', 'Marcus Aurelius', 'School of Life', 'wisdom', 'psychology'],
-        junk: ['LIFE HACK', 'EASY FIX', 'drama', 'exposed', 'clickbait']
-      },
-      scientist: {
-        educational: ['science', 'research', 'MIT', 'physics', 'chemistry', 'SmarterEveryDay', 'Veritasium', 'Kurzgesagt'],
-        junk: ['pseudoscience', 'flat earth', 'conspiracy', 'SHOCKING', 'SECRET CURE']
-      },
-      artist: {
-        educational: ['art', 'design', 'tutorial', 'Proko', 'painting', 'drawing', 'color theory', 'masterclass'],
-        junk: ['drama', 'exposed', 'beef', 'clickbait']
-      },
-      warrior: {
-        educational: ['fitness', 'training', 'workout', 'martial arts', 'AthleanX', 'Jeff Nippard', 'technique', 'Jocko'],
-        junk: ['SHOCKING', 'drama', 'EASY TRICK', 'SECRET METHOD']
-      },
-      healer: {
-        educational: ['health', 'medicine', 'Huberman Lab', 'Peter Attia', 'nutrition', 'sleep', 'research', 'science-based'],
-        junk: ['SECRET CURE', 'doctors hate', 'miracle cure', 'detox', 'SHOCKING']
-      },
-      explorer: {
-        educational: ['travel', 'geography', 'documentary', 'National Geographic', 'BBC Earth', 'history', 'culture'],
-        junk: ['SHOCKING', 'GONE WRONG', 'drama', 'clickbait']
-      },
-      sage: {
-        educational: ['wisdom', 'philosophy', 'Alan Watts', 'meditation', 'consciousness', 'Buddhism', 'mindfulness'],
-        junk: ['SHOCKING', 'SECRET REVEALED', 'clickbait', 'quick fix']
-      }
-    };
-  }
-
+  // Start when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
+
 })();
