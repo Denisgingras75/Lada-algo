@@ -24,6 +24,7 @@
   let lastActionTime = 0;
   let dailyActionCount = 0;
   let actionProcessorInterval = null;
+  let debugPanel = null;
 
   // Initialize
   chrome.storage.sync.get([
@@ -160,6 +161,60 @@
 
     startObserver();
     startActionProcessor();
+    createDebugPanel();
+  }
+
+  // Debug panel to show what's happening
+  function createDebugPanel() {
+    if (debugPanel) return; // Already exists
+
+    debugPanel = document.createElement('div');
+    debugPanel.id = 'focus-feed-debug';
+    debugPanel.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      z-index: 10000;
+      min-width: 250px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    `;
+
+    debugPanel.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px; font-size: 14px;">🎯 Focus Feed Active</div>
+      <div style="margin-bottom: 5px;">Persona: <span id="ff-persona">${selectedPersona}</span></div>
+      <div style="margin-bottom: 5px;">Intensity: <span id="ff-intensity">${trainingIntensity}%</span></div>
+      <div style="margin-bottom: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
+        <div style="margin-bottom: 3px;">✅ Educational: <span id="ff-educational">0</span></div>
+        <div style="margin-bottom: 3px;">❌ Junk: <span id="ff-junk">0</span></div>
+        <div style="margin-bottom: 3px;">○ Neutral: <span id="ff-neutral">0</span></div>
+      </div>
+      <div id="ff-last-action" style="font-size: 11px; opacity: 0.8; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);"></div>
+    `;
+
+    document.body.appendChild(debugPanel);
+  }
+
+  function updateDebugPanel(action = null) {
+    if (!debugPanel) return;
+
+    document.getElementById('ff-educational').textContent = stats.liked;
+    document.getElementById('ff-junk').textContent = stats.hidden;
+    document.getElementById('ff-neutral').textContent = stats.neutral;
+
+    if (action) {
+      const lastActionEl = document.getElementById('ff-last-action');
+      lastActionEl.textContent = action;
+      lastActionEl.style.animation = 'none';
+      setTimeout(() => {
+        lastActionEl.style.animation = 'pulse 0.5s';
+      }, 10);
+    }
   }
 
   // YOUTUBE MODULE
@@ -199,6 +254,7 @@
         title,
         channel
       });
+      updateDebugPanel(`✅ Found: ${title.substring(0, 40)}...`);
     } else if (classification === 'junk' && trainingIntensity >= 70) {
       // Only hide junk at 70%+ intensity
       queueAction({
@@ -207,8 +263,10 @@
         title,
         channel
       });
+      updateDebugPanel(`❌ Hiding: ${title.substring(0, 40)}...`);
     } else {
       stats.neutral++;
+      updateDebugPanel(`Checked: ${title.substring(0, 40)}...`);
     }
   }
 
@@ -536,6 +594,7 @@
         timestamp: Date.now()
       }
     });
+    updateDebugPanel();
   }
 
   // OBSERVER
@@ -578,8 +637,32 @@
   function getClassifierRules() {
     return {
       polymath: {
-        educational: ['MIT', 'Stanford', 'lecture', 'course', 'tutorial', 'explained', 'documentary', 'TED', 'science', 'Khan Academy'],
-        junk: ['SHOCKING', 'UNBELIEVABLE', 'WON\'T BELIEVE', 'GONE WRONG', 'clickbait', 'drama', 'exposed', 'flat earth', 'conspiracy']
+        educational: [
+          // Universities & Institutions
+          'MIT', 'Stanford', 'Harvard', 'Yale', 'Berkeley', 'Oxford', 'Cambridge',
+          // Educational Channels
+          'Khan Academy', 'TED', 'Crash Course', 'Veritasium', 'Kurzgesagt',
+          'SmarterEveryDay', 'Vsauce', '3Blue1Brown', 'Numberphile',
+          // Content Types
+          'lecture', 'course', 'tutorial', 'explained', 'documentary', 'science',
+          'learn', 'education', 'study', 'lesson', 'guide', 'how to', 'introduction',
+          'review', 'analysis', 'breakdown', 'deep dive', 'masterclass',
+          // Subject Matter
+          'physics', 'mathematics', 'chemistry', 'biology', 'history', 'philosophy',
+          'engineering', 'programming', 'coding', 'research', 'theory'
+        ],
+        junk: [
+          // Clickbait
+          'SHOCKING', 'UNBELIEVABLE', 'WON\'T BELIEVE', 'YOU WON\'T', 'INSANE',
+          'MIND BLOWING', 'GONE WRONG', 'GONE SEXUAL',
+          // Drama
+          'drama', 'exposed', 'cancelled', 'beef', 'diss track', 'tea', 'shade',
+          'cringe', 'roast', 'destroyed', 'react',
+          // Misinformation
+          'flat earth', 'conspiracy', 'illuminati', 'fake', 'hoax',
+          // Low quality
+          'clickbait', 'vlog', 'prank', 'challenge', '24 hours', 'vs', 'fortnite'
+        ]
       },
       engineer: {
         educational: ['engineering', 'coding', 'programming', 'tutorial', 'Python', 'JavaScript', 'CS50', 'ThePrimeagen', 'Fireship'],
