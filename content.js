@@ -15,9 +15,60 @@
     if (message.action === 'likeCurrentVideo') {
       likeCurrentVideoPage();
       sendResponse({ success: true });
+    } else if (message.action === 'playAndLikeVideo') {
+      playAndLikeVideo();
+      sendResponse({ success: true });
     }
     return true;
   });
+
+  // Function to PLAY and LIKE video (stronger signal)
+  function playAndLikeVideo() {
+    try {
+      // First, try to play the video
+      const playButton = document.querySelector('button.ytp-play-button');
+      const video = document.querySelector('video');
+
+      if (video && video.paused) {
+        console.log('[Focus Feed] ▶️ Playing video:', document.title);
+        video.play();
+      } else if (playButton) {
+        playButton.click();
+      }
+
+      // Then like it (after 2 second delay)
+      setTimeout(() => {
+        const likeButton = document.querySelector(
+          'like-button-view-model button[aria-label*="like"], ' +
+          'button[aria-label="Like this video"], ' +
+          '#segmented-like-button button'
+        );
+
+        if (likeButton && likeButton.getAttribute('aria-pressed') !== 'true') {
+          console.log('[Focus Feed] ❤️ Liking video:', document.title);
+          likeButton.click();
+        }
+      }, 2000);
+
+      // ALSO SUBSCRIBE to channel (even stronger signal)
+      setTimeout(() => {
+        const subscribeButton = document.querySelector(
+          'ytd-subscribe-button-renderer button[aria-label*="Subscribe"], ' +
+          'button.yt-spec-button-shape-next[aria-label*="Subscribe"]'
+        );
+
+        if (subscribeButton && subscribeButton.textContent.toLowerCase().includes('subscribe')) {
+          console.log('[Focus Feed] 🔔 Subscribing to channel');
+          subscribeButton.click();
+        }
+      }, 4000);
+
+      return true;
+    } catch (error) {
+      console.error('[Focus Feed] Error playing/liking video:', error);
+      return false;
+    }
+  }
 
   // Function to like video when on video watch page
   function likeCurrentVideoPage() {
@@ -103,11 +154,33 @@
         <div style="margin-bottom: 3px;">❌ Junk: <span id="ff-junk">0</span></div>
         <div style="margin-bottom: 3px;">○ Neutral: <span id="ff-neutral">0</span></div>
       </div>
+      <button id="ff-turbo-btn" style="
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ff4757 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 13px;
+        box-shadow: 0 2px 8px rgba(255,75,87,0.4);
+      ">🚀 TURBO TRAIN NOW</button>
+      <div id="ff-progress" style="margin-top: 10px; display: none;">
+        <div style="background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
+          <div id="ff-progress-bar" style="background: #4ade80; height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <div style="font-size: 10px; margin-top: 5px; text-align: center;" id="ff-progress-text">Training...</div>
+      </div>
       <div id="ff-last-action" style="font-size: 11px; opacity: 0.8; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);"></div>
     `;
 
     document.body.appendChild(debugPanel);
     console.log('[Focus Feed] ✓ Debug panel created');
+
+    // Add turbo button click handler
+    document.getElementById('ff-turbo-btn').addEventListener('click', activateTurboMode);
   }
 
   function updateDebugPanel(action = null) {
@@ -308,6 +381,88 @@
     });
 
     console.log('[Focus Feed] ✓ Observer started');
+  }
+
+  // TURBO MODE: Floods algorithm with educational content
+  function activateTurboMode() {
+    console.log('[Focus Feed] 🚀 TURBO MODE ACTIVATED');
+
+    const btn = document.getElementById('ff-turbo-btn');
+    const progressDiv = document.getElementById('ff-progress');
+    const progressBar = document.getElementById('ff-progress-bar');
+    const progressText = document.getElementById('ff-progress-text');
+
+    btn.disabled = true;
+    btn.textContent = '⚡ TRAINING...';
+    progressDiv.style.display = 'block';
+
+    // Collect educational videos from current page
+    const videos = [];
+    const videoElements = document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer');
+
+    videoElements.forEach(videoElement => {
+      const titleElement = videoElement.querySelector('#video-title');
+      const channelElement = videoElement.querySelector('#channel-name a, #text.ytd-channel-name a');
+
+      if (!titleElement) return;
+
+      const title = titleElement.textContent.trim();
+      const channel = channelElement ? channelElement.textContent.trim() : '';
+      const classification = classifyContent(title, channel);
+
+      if (classification === 'educational') {
+        const videoUrl = titleElement.getAttribute('href');
+        if (videoUrl) {
+          videos.push({ videoUrl, title });
+        }
+      }
+    });
+
+    console.log(`[Focus Feed] Found ${videos.length} educational videos on page`);
+
+    // If not enough videos, search for more
+    if (videos.length < 10) {
+      searchAndAddEducationalVideos(videos, progressBar, progressText, btn);
+    } else {
+      // Send to background for processing
+      const videosBatch = videos.slice(0, 20); // Max 20 videos
+      chrome.runtime.sendMessage({
+        action: 'turboTrain',
+        videos: videosBatch
+      }, () => {
+        progressBar.style.width = '100%';
+        progressText.textContent = `Training with ${videosBatch.length} videos!`;
+
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '🚀 TURBO TRAIN NOW';
+          progressDiv.style.display = 'none';
+          progressBar.style.width = '0%';
+        }, 3000);
+      });
+    }
+  }
+
+  function searchAndAddEducationalVideos(videos, progressBar, progressText, btn) {
+    // Educational search queries
+    const searches = [
+      'MIT OpenCourseWare',
+      'Stanford lecture',
+      'Veritasium',
+      'Kurzgesagt',
+      '3Blue1Brown',
+      'Khan Academy tutorial',
+      'TED talk science',
+      'Harvard lecture'
+    ];
+
+    const searchQuery = searches[Math.floor(Math.random() * searches.length)];
+
+    progressText.textContent = `Searching for: ${searchQuery}...`;
+    progressBar.style.width = '50%';
+
+    // Navigate to search (will trigger new scan)
+    window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
   }
 
   // Start when DOM is ready

@@ -1,94 +1,117 @@
-// Background service worker for Focus Feed
-// Handles opening videos in background tabs to like them
+// Background service worker for Focus Feed - TURBO MODE
+// Opens multiple tabs simultaneously to FLOOD the algorithm
 
 let videoQueue = [];
 let isProcessing = false;
 let processedVideos = new Set();
+let activeTabs = new Set();
+const MAX_PARALLEL_TABS = 10; // Open 10 tabs at once for FAST results
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'likeVideo') {
     handleLikeVideo(message.videoUrl, message.title);
     sendResponse({ success: true });
+  } else if (message.action === 'turboTrain') {
+    handleTurboTrain(message.videos);
+    sendResponse({ success: true });
   } else if (message.action === 'getQueueStatus') {
-    sendResponse({ queueLength: videoQueue.length, isProcessing });
+    sendResponse({ queueLength: videoQueue.length, isProcessing, activeTabs: activeTabs.size });
   }
   return true;
 });
 
-async function handleLikeVideo(videoUrl, title) {
-  // Don't process same video twice
-  if (processedVideos.has(videoUrl)) {
-    console.log('[Focus Feed BG] Already processed:', videoUrl);
-    return;
-  }
+// TURBO MODE: Process multiple videos at once
+async function handleTurboTrain(videos) {
+  console.log(`[Focus Feed TURBO] 🚀 Starting turbo train with ${videos.length} videos`);
 
-  // Add to queue
+  // Add all videos to queue
+  videos.forEach(({ videoUrl, title }) => {
+    if (!processedVideos.has(videoUrl)) {
+      videoQueue.push({ videoUrl, title });
+      processedVideos.add(videoUrl);
+    }
+  });
+
+  // Start processing in parallel
+  if (!isProcessing) {
+    processQueueParallel();
+  }
+}
+
+async function handleLikeVideo(videoUrl, title) {
+  if (processedVideos.has(videoUrl)) return;
+
   videoQueue.push({ videoUrl, title });
   processedVideos.add(videoUrl);
 
-  // Limit processed videos set size to prevent memory bloat
   if (processedVideos.size > 500) {
     processedVideos.clear();
   }
 
-  // Start processing if not already running
   if (!isProcessing) {
-    processQueue();
+    processQueueParallel();
   }
 }
 
-async function processQueue() {
+// Process multiple videos in parallel
+async function processQueueParallel() {
   if (videoQueue.length === 0) {
     isProcessing = false;
     return;
   }
 
   isProcessing = true;
-  const { videoUrl, title } = videoQueue.shift();
 
+  // Process up to MAX_PARALLEL_TABS videos at once
+  while (videoQueue.length > 0 && activeTabs.size < MAX_PARALLEL_TABS) {
+    const { videoUrl, title } = videoQueue.shift();
+    processVideoTab(videoUrl, title);
+  }
+
+  // Check again after delay
+  setTimeout(() => {
+    processQueueParallel();
+  }, 2000);
+}
+
+async function processVideoTab(videoUrl, title) {
   try {
-    console.log(`[Focus Feed BG] Opening video to like: ${title}`);
+    console.log(`[Focus Feed BG] 🎯 Opening: ${title}`);
 
-    // Open video in new tab (in background)
     const tab = await chrome.tabs.create({
       url: `https://www.youtube.com${videoUrl}`,
-      active: false // Don't switch to this tab
+      active: false
     });
 
-    // Wait for page to load, then like and close
+    activeTabs.add(tab.id);
+
+    // Listen for page load
     chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
       if (tabId === tab.id && changeInfo.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
 
-        // Wait a bit for YouTube to fully load, then send message to like
+        // CRITICAL: Wait for video to load, then PLAY + LIKE
         setTimeout(() => {
-          chrome.tabs.sendMessage(tabId, { action: 'likeCurrentVideo' }, (response) => {
-            // Close the tab after liking (or after timeout)
+          chrome.tabs.sendMessage(tabId, { action: 'playAndLikeVideo' }, (response) => {
+            // Let video play for 10 seconds (enough to register view)
             setTimeout(() => {
               chrome.tabs.remove(tabId).catch(() => {});
-            }, 2000);
+              activeTabs.delete(tabId);
+            }, 10000); // 10 second watch time
           });
-        }, 3000); // Wait 3 seconds for full load
+        }, 2000);
       }
     });
 
-    // Continue processing next video after delay
-    setTimeout(() => {
-      processQueue();
-    }, 8000); // 8 second delay between opening tabs
-
   } catch (error) {
-    console.error('[Focus Feed BG] Error processing video:', error);
-    // Continue with next video
-    setTimeout(() => {
-      processQueue();
-    }, 5000);
+    console.error('[Focus Feed BG] Error:', error);
   }
 }
 
-// Clean up old processed videos on extension startup
+// Clean up on startup
 chrome.runtime.onStartup.addListener(() => {
   processedVideos.clear();
   videoQueue = [];
+  activeTabs.clear();
 });
