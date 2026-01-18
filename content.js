@@ -2,7 +2,7 @@
   'use strict';
 
   let trainingEnabled = true;
-  let selectedPersona = 'polymath';
+  let selectedPersona = 'common-sense';
   let trainingIntensity = 80;
   let processedElements = new Set();
   let stats = { liked: 0, hidden: 0, neutral: 0 };
@@ -94,7 +94,7 @@
   // Initialize
   chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity'], (result) => {
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
-    selectedPersona = result.selectedPersona || 'polymath';
+    selectedPersona = result.selectedPersona || 'common-sense';
     trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
 
     console.log(`[Focus Feed] Loaded - Persona: ${selectedPersona}, Intensity: ${trainingIntensity}%`);
@@ -333,30 +333,269 @@
 
   function getPersonaRules(persona) {
     const allRules = {
-      polymath: {
+      'common-sense': {
         educational: [
-          'MIT', 'Stanford', 'Harvard', 'Yale', 'Berkeley', 'Oxford', 'Cambridge',
-          'Khan Academy', 'TED', 'Crash Course', 'Veritasium', 'Kurzgesagt',
-          'SmarterEveryDay', 'Vsauce', '3Blue1Brown', 'Numberphile',
-          'lecture', 'course', 'tutorial', 'explained', 'documentary', 'science',
-          'learn', 'education', 'study', 'lesson', 'guide', 'how to',
-          'physics', 'mathematics', 'chemistry', 'biology', 'history', 'philosophy',
-          'engineering', 'programming', 'research'
+          // Practical skills
+          'how to', 'tutorial', 'guide', 'explained', 'learn', 'teach', 'education',
+          'lesson', 'course', 'masterclass', 'fundamentals', 'basics', 'advanced',
+          'step by step', 'beginner guide', 'complete guide', 'full course',
+          'deep dive', 'breakdown', 'analysis', 'review', 'critical thinking',
+
+          // Life skills
+          'productivity', 'self improvement', 'personal development', 'habits',
+          'time management', 'critical thinking', 'problem solving', 'decision making',
+          'communication skills', 'public speaking', 'writing skills', 'reading',
+
+          // Finance & career
+          'financial literacy', 'budgeting', 'investing', 'career advice', 'resume',
+          'interview tips', 'negotiation', 'salary', 'retirement', 'taxes',
+
+          // Health & wellness
+          'nutrition', 'exercise', 'mental health', 'sleep', 'stress management',
+          'mindfulness', 'meditation', 'therapy', 'psychology', 'neuroscience',
+
+          // General knowledge
+          'history', 'geography', 'science', 'technology', 'current events',
+          'documentary', 'informative', 'educational', 'factual', 'evidence based',
+
+          // Trusted sources
+          'NPR', 'BBC', 'PBS', 'National Geographic', 'Scientific American',
+          'The Economist', 'Wall Street Journal', 'New York Times', 'Reuters'
         ],
         junk: [
-          'SHOCKING', 'UNBELIEVABLE', 'WON\'T BELIEVE', 'YOU WON\'T', 'INSANE',
-          'MIND BLOWING', 'GONE WRONG', 'GONE SEXUAL',
-          'drama', 'exposed', 'cancelled', 'beef', 'cringe', 'roast',
-          'flat earth', 'conspiracy', 'clickbait', 'prank', 'challenge'
+          // Clickbait phrases
+          'YOU WON\'T BELIEVE', 'SHOCKING', 'UNBELIEVABLE', 'INSANE', 'CRAZY',
+          'MIND BLOWING', 'MUST SEE', 'MUST WATCH', 'THIS WILL CHANGE',
+          'LIFE CHANGING', 'GAME CHANGER', 'SECRET REVEALED', 'THEY DON\'T WANT',
+          'GONE WRONG', 'GONE SEXUAL', 'ALMOST DIED', 'EMOTIONAL', 'IN TEARS',
+
+          // Drama & gossip
+          'drama', 'tea', 'spill', 'exposed', 'cancelled', 'beef', 'diss track',
+          'shade', 'feud', 'fight', 'destroyed', 'roasted', 'cringe', 'react',
+
+          // Low effort content
+          'prank', 'challenge', 'mukbang', 'haul', 'unboxing', 'vlog', 'vlogging',
+          '24 hours', 'last to', 'who can', 'vs', 'versus', 'battle',
+
+          // Misinformation
+          'flat earth', 'conspiracy', 'illuminati', 'reptilian', 'fake moon landing',
+          'chemtrails', 'anti vax', 'miracle cure', 'doctors hate', 'big pharma',
+
+          // Toxic patterns
+          'DESTROYING', 'OBLITERATES', 'ANNIHILATES', 'OWNS', 'WRECKS', 'SLAMS'
         ]
       },
-      engineer: {
-        educational: ['engineering', 'coding', 'programming', 'tutorial', 'Python', 'JavaScript', 'CS50', 'algorithm', 'database'],
-        junk: ['SHOCKED', 'drama', 'exposed', 'GONE WRONG', 'clickbait']
+
+      polymath: {
+        educational: [
+          // Universities & Institutions (expanded)
+          'MIT', 'Stanford', 'Harvard', 'Yale', 'Princeton', 'Berkeley', 'Caltech',
+          'Oxford', 'Cambridge', 'Imperial College', 'ETH Zurich', 'Carnegie Mellon',
+          'Columbia', 'Cornell', 'Duke', 'Johns Hopkins', 'Northwestern', 'Penn',
+          'University of Chicago', 'UCLA', 'Michigan', 'UC Berkeley', 'UT Austin',
+
+          // Educational Channels (massive expansion)
+          'Khan Academy', 'TED', 'TED-Ed', 'TEDx', 'Crash Course', 'CrashCourse',
+          'Veritasium', 'Kurzgesagt', 'SmarterEveryDay', 'Vsauce', 'Vsauce2', 'Vsauce3',
+          '3Blue1Brown', 'Numberphile', 'Computerphile', 'Periodic Videos',
+          'MinutePhysics', 'MinuteEarth', 'AsapSCIENCE', 'SciShow', 'PBS Space Time',
+          'PBS Eons', 'Physics Girl', 'ElectroBOOM', 'NileRed', 'NileBlue',
+          'Steve Mould', 'Mark Rober', 'Tom Scott', 'CGP Grey', 'Wendover',
+          'Real Engineering', 'Practical Engineering', 'Technology Connections',
+          'Up and Atom', 'Looking Glass Universe', 'Domain of Science',
+          'Two Minute Papers', 'Lex Fridman', 'Andrew Huberman', 'Peter Attia',
+
+          // Content Type Phrases (multi-word strings)
+          'explained simply', 'explained in', 'how it works', 'introduction to',
+          'beginner guide', 'complete guide', 'full course', 'free course',
+          'online course', 'lecture series', 'lecture notes', 'study guide',
+          'learn in', 'master class', 'deep dive into', 'breakdown of',
+          'analysis of', 'understanding', 'comprehensive guide', 'step by step',
+          'from scratch', 'for beginners', 'fundamentals of', 'basics of',
+          'advanced', 'intermediate', 'tutorial series', 'educational video',
+          'documentary film', 'scientific explanation', 'research paper',
+          'peer reviewed', 'evidence based', 'data driven', 'case study',
+
+          // Academic Terms
+          'lecture', 'seminar', 'symposium', 'conference', 'presentation',
+          'dissertation', 'thesis', 'research', 'study', 'experiment', 'theory',
+          'hypothesis', 'methodology', 'empirical', 'quantitative', 'qualitative',
+
+          // Subjects (massive expansion)
+          // STEM
+          'physics', 'quantum physics', 'astrophysics', 'cosmology', 'astronomy',
+          'mathematics', 'calculus', 'linear algebra', 'differential equations',
+          'statistics', 'probability', 'number theory', 'topology', 'geometry',
+          'chemistry', 'organic chemistry', 'biochemistry', 'molecular biology',
+          'genetics', 'microbiology', 'neuroscience', 'cognitive science',
+          'computer science', 'algorithms', 'data structures', 'machine learning',
+          'artificial intelligence', 'programming', 'coding', 'software engineering',
+          'electrical engineering', 'mechanical engineering', 'civil engineering',
+
+          // Humanities & Social Sciences
+          'philosophy', 'ethics', 'epistemology', 'metaphysics', 'logic',
+          'history', 'world history', 'ancient history', 'medieval history',
+          'economics', 'microeconomics', 'macroeconomics', 'behavioral economics',
+          'psychology', 'sociology', 'anthropology', 'political science',
+          'linguistics', 'literature', 'poetry', 'rhetoric', 'critical theory',
+
+          // Arts & Culture
+          'art history', 'music theory', 'film analysis', 'architecture',
+          'classical music', 'opera', 'jazz theory', 'composition',
+
+          // Skills
+          'critical thinking', 'scientific method', 'logical reasoning',
+          'problem solving', 'analytical thinking', 'systems thinking',
+
+          // Formats
+          'documentary', 'educational', 'informative', 'instructional',
+          'academic', 'scholarly', 'intellectual', 'cerebral', 'rigorous'
+        ],
+        junk: [
+          // Extreme clickbait (expanded)
+          'YOU WON\'T BELIEVE', 'WILL SHOCK YOU', 'SHOCKING TRUTH', 'UNBELIEVABLE',
+          'MOST INSANE', 'CRAZIEST', 'WILDEST', 'MOST SHOCKING', 'INCREDIBLE',
+          'MIND BLOWING', 'MIND BLOWN', 'BLEW MY MIND', 'CHANGED MY LIFE',
+          'LIFE CHANGING', 'GAME CHANGER', 'EVERYTHING CHANGED', 'RUINED MY LIFE',
+          'ALMOST DIED', 'NEARLY KILLED', 'WENT HORRIBLY WRONG', 'TOTAL DISASTER',
+          'EPIC FAIL', 'FAIL COMPILATION', 'FAILS', 'FUNNY FAILS',
+
+          // Secret/conspiracy clickbait
+          'SECRET', 'SECRETS REVEALED', 'HIDDEN TRUTH', 'THEY DON\'T WANT YOU',
+          'THEY\'RE HIDING', 'COVER UP', 'EXPOSED', 'TRUTH EXPOSED',
+          'WHAT THEY DON\'T TELL YOU', 'INDUSTRY SECRET', 'LEAKED',
+
+          // Emotional manipulation
+          'EMOTIONAL', 'CRIED', 'IN TEARS', 'CRYING', 'HEARTBREAKING',
+          'WILL MAKE YOU CRY', 'SAD STORY', 'TOUCHING', 'INSPIRATIONAL FAIL',
+
+          // Drama & gossip (expanded)
+          'drama', 'tea', 'spilling tea', 'all the tea', 'drama alert',
+          'exposed', 'exposing', 'calling out', 'cancelled', 'cancel culture',
+          'beef', 'diss track', 'diss', 'shots fired', 'shade', 'throwing shade',
+          'feud', 'fight', 'argument', 'destroyed', 'roasted', 'roasting',
+          'cringe', 'cringe compilation', 'reaction', 'reacting to', 'react',
+          'commentary', 'my thoughts on', 'hot take', 'unpopular opinion',
+
+          // Low quality formats
+          'prank', 'pranking', 'prank war', 'epic prank', 'gone wrong',
+          'challenge', 'challenges', '24 hour challenge', '24 hours in',
+          'last to leave', 'last to', 'who can', 'trying', 'we tried',
+          'mukbang', 'eating', 'food challenge', 'taste test',
+          'haul', 'shopping haul', 'unboxing', 'unbox', 'first impressions',
+          'vlog', 'daily vlog', 'day in my life', 'vlogging',
+          'among us', 'fortnite', 'minecraft', 'roblox', 'tiktok',
+
+          // Versus/battle content
+          'vs', 'versus', 'battle', 'rap battle', 'roast battle',
+          'who wore it better', 'comparison', 'tier list',
+
+          // Misinformation & pseudoscience
+          'flat earth', 'flat earther', 'conspiracy', 'conspiracy theory',
+          'illuminati', 'reptilian', 'new world order', 'deep state',
+          'fake moon landing', 'moon landing hoax', 'chemtrails',
+          'anti vax', 'anti vaxx', 'vaccine injury', 'big pharma conspiracy',
+          'miracle cure', 'doctors hate this', 'one weird trick',
+          'detox', 'cleanse', 'toxins', 'manifesting', 'law of attraction',
+
+          // Toxic/aggressive language
+          'DESTROYING', 'DESTROYS', 'DESTROYED', 'OBLITERATES', 'OBLITERATED',
+          'ANNIHILATES', 'OWNS', 'OWNED', 'WRECKS', 'WRECKED', 'SLAMS',
+          'DEMOLISHES', 'CRUSHES', 'HUMILIATES', 'EMBARRASSES',
+
+          // Spam patterns
+          'LIKE AND SUBSCRIBE', 'SMASH THAT LIKE', 'HIT THE BELL',
+          'DON\'T FORGET TO', 'MAKE SURE TO', 'BEFORE YOU GO',
+          'WAIT UNTIL THE END', 'WATCH TILL THE END', 'ENDING WILL',
+
+          // Sexual/inappropriate
+          'GONE SEXUAL', 'SEXUAL', 'SEXY', 'HOT', 'THICC', 'THIRST TRAP',
+          'ONLY FANS', 'ONLYFANS', 'SPICY', 'NAUGHTY', 'INAPPROPRIATE'
+        ]
       },
+
+      engineer: {
+        educational: [
+          // Programming languages & frameworks
+          'programming', 'coding', 'software engineering', 'development',
+          'Python', 'JavaScript', 'Java', 'C++', 'C#', 'Go', 'Rust', 'Swift',
+          'Kotlin', 'TypeScript', 'Ruby', 'PHP', 'SQL', 'R', 'Scala',
+          'React', 'Angular', 'Vue', 'Node', 'Django', 'Flask', 'Spring',
+          'TensorFlow', 'PyTorch', 'Kubernetes', 'Docker', 'AWS', 'Azure',
+
+          // CS Fundamentals
+          'algorithm', 'data structure', 'Big O', 'complexity', 'optimization',
+          'sorting', 'searching', 'graph', 'tree', 'linked list', 'hash table',
+          'dynamic programming', 'recursion', 'object oriented', 'functional',
+
+          // Educational channels
+          'CS50', 'freeCodeCamp', 'Traversy Media', 'The Net Ninja',
+          'Fireship', 'ThePrimeagen', 'Code Bullet', 'Computerphile',
+          'Hussein Nasser', 'Coding Train', 'Derek Banas', 'Sentdex',
+          'Tech With Tim', 'Corey Schafer', 'ArjanCodes', 'mCoding',
+
+          // Topics
+          'system design', 'architecture', 'design patterns', 'clean code',
+          'testing', 'debugging', 'refactoring', 'performance', 'security',
+          'database design', 'API design', 'microservices', 'DevOps',
+          'CI/CD', 'git', 'version control', 'agile', 'scrum',
+
+          // Learning phrases
+          'tutorial', 'course', 'bootcamp', 'project', 'build', 'create',
+          'explained', 'guide to', 'introduction to', 'how to build',
+          'step by step', 'from scratch', 'for beginners', 'crash course'
+        ],
+        junk: [
+          'SHOCKING', 'drama', 'exposed', 'GONE WRONG', 'clickbait',
+          'prank', 'challenge', 'react', 'roast', 'beef', 'cancelled',
+          'UNBELIEVABLE', 'INSANE', 'MIND BLOWING', 'SECRET', 'THEY HIDE',
+          'get rich quick', 'make money fast', 'easy money', 'passive income scam'
+        ]
+      },
+
       strategist: {
-        educational: ['business', 'strategy', 'finance', 'Y Combinator', 'Bloomberg', 'Warren Buffett', 'startup', 'economics'],
-        junk: ['get rich quick', 'EASY MONEY', 'SECRET METHOD', 'exposed', 'drama']
+        educational: [
+          // Business & Strategy
+          'business', 'strategy', 'business strategy', 'competitive advantage',
+          'market analysis', 'business model', 'value proposition', 'disruption',
+          'innovation', 'entrepreneurship', 'startup', 'scale up', 'growth',
+
+          // Finance & Investing
+          'finance', 'investing', 'investment', 'stock market', 'portfolio',
+          'diversification', 'asset allocation', 'risk management', 'valuation',
+          'financial analysis', 'fundamental analysis', 'technical analysis',
+          'value investing', 'index fund', 'ETF', 'dividend', 'compound interest',
+
+          // Economics
+          'economics', 'microeconomics', 'macroeconomics', 'monetary policy',
+          'fiscal policy', 'supply and demand', 'market efficiency', 'game theory',
+          'behavioral economics', 'incentives', 'trade', 'globalization',
+
+          // Sources & Channels
+          'Y Combinator', 'Stanford Business', 'Harvard Business Review',
+          'Bloomberg', 'CNBC', 'Financial Times', 'Wall Street Journal',
+          'Warren Buffett', 'Charlie Munger', 'Ray Dalio', 'Peter Thiel',
+          'Naval Ravikant', 'Patrick O\'Shaughnessy', 'Ben Thompson',
+          'The Economist', 'McKinsey', 'BCG', 'Bain',
+
+          // Topics
+          'case study', 'business case', 'ROI', 'unit economics', 'metrics',
+          'KPI', 'OKR', 'product market fit', 'go to market', 'pricing',
+          'marketing', 'sales', 'operations', 'supply chain', 'logistics',
+          'management', 'leadership', 'negotiation', 'decision making',
+
+          // Learning phrases
+          'explained', 'analysis', 'breakdown', 'deep dive', 'framework',
+          'model', 'theory', 'principle', 'lesson', 'insight'
+        ],
+        junk: [
+          'get rich quick', 'EASY MONEY', 'SECRET METHOD', 'MILLIONAIRE OVERNIGHT',
+          'passive income lie', 'dropshipping scam', 'crypto scam', 'NFT scam',
+          'forex scam', 'binary options', 'pump and dump', 'ponzi scheme',
+          'multi level marketing', 'MLM', 'pyramid scheme',
+          'exposed', 'drama', 'beef', 'cancelled', 'SHOCKING', 'UNBELIEVABLE',
+          'one weird trick', 'secret the rich', 'what billionaires', 'they hide'
+        ]
       }
     };
 

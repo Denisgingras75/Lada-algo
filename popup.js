@@ -11,6 +11,11 @@ const exportBtn = document.getElementById('exportBtn');
 
 const personas = [
   {
+    id: 'common-sense',
+    name: '🎯 Common Sense',
+    description: 'Practical skills, life advice & real knowledge'
+  },
+  {
     id: 'polymath',
     name: 'The Polymath',
     description: 'Renaissance thinking across disciplines'
@@ -64,7 +69,7 @@ const personas = [
 
 chrome.storage.sync.get(['focusEnabled', 'selectedPersona', 'trainingIntensity', 'dailyStats'], (result) => {
   const focusEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
-  const selectedPersona = result.selectedPersona || 'polymath';
+  const selectedPersona = result.selectedPersona || 'common-sense';
   const intensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
 
   toggleSwitch.checked = focusEnabled;
