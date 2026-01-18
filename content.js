@@ -166,7 +166,8 @@
         cursor: pointer;
         font-size: 13px;
         box-shadow: 0 2px 8px rgba(255,75,87,0.4);
-      ">🚀 TURBO TRAIN NOW</button>
+      ">🚀 MEGA TURBO TRAIN</button>
+      <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">Trains ALL platforms at once!</div>
       <div id="ff-progress" style="margin-top: 10px; display: none;">
         <div style="background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden;">
           <div id="ff-progress-bar" style="background: #4ade80; height: 100%; width: 0%; transition: width 0.3s;"></div>
@@ -622,9 +623,9 @@
     console.log('[Focus Feed] ✓ Observer started');
   }
 
-  // TURBO MODE: Floods algorithm with educational content
+  // MEGA TURBO MODE: Floods ALL algorithms across ALL platforms
   function activateTurboMode() {
-    console.log('[Focus Feed] 🚀 TURBO MODE ACTIVATED');
+    console.log('[Focus Feed] 🚀🚀🚀 MEGA TURBO MODE ACTIVATED');
 
     const btn = document.getElementById('ff-turbo-btn');
     const progressDiv = document.getElementById('ff-progress');
@@ -632,54 +633,28 @@
     const progressText = document.getElementById('ff-progress-text');
 
     btn.disabled = true;
-    btn.textContent = '⚡ TRAINING...';
+    btn.textContent = '⚡ FLOODING ALGORITHMS...';
     progressDiv.style.display = 'block';
+    progressBar.style.width = '30%';
+    progressText.textContent = 'Opening separate window...';
 
-    // Collect educational videos from current page
-    const videos = [];
-    const videoElements = document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer');
+    // Send MEGA TURBO command with current persona
+    chrome.runtime.sendMessage({
+      action: 'turboTrain',
+      persona: selectedPersona
+    }, () => {
+      progressBar.style.width = '100%';
+      progressText.textContent = '200+ URLs across ALL platforms!';
 
-    videoElements.forEach(videoElement => {
-      const titleElement = videoElement.querySelector('#video-title');
-      const channelElement = videoElement.querySelector('#channel-name a, #text.ytd-channel-name a');
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🚀 MEGA TURBO TRAIN';
+        progressDiv.style.display = 'none';
+        progressBar.style.width = '0%';
 
-      if (!titleElement) return;
-
-      const title = titleElement.textContent.trim();
-      const channel = channelElement ? channelElement.textContent.trim() : '';
-      const classification = classifyContent(title, channel);
-
-      if (classification === 'educational') {
-        const videoUrl = titleElement.getAttribute('href');
-        if (videoUrl) {
-          videos.push({ videoUrl, title });
-        }
-      }
+        updateDebugPanel('✓ MEGA trained: YouTube, X, Facebook, Instagram, Wikipedia, Reddit, Medium, Quora, GitHub...');
+      }, 5000);
     });
-
-    console.log(`[Focus Feed] Found ${videos.length} educational videos on page`);
-
-    // If not enough videos, search for more
-    if (videos.length < 10) {
-      searchAndAddEducationalVideos(videos, progressBar, progressText, btn);
-    } else {
-      // Send to background for processing
-      const videosBatch = videos.slice(0, 20); // Max 20 videos
-      chrome.runtime.sendMessage({
-        action: 'turboTrain',
-        videos: videosBatch
-      }, () => {
-        progressBar.style.width = '100%';
-        progressText.textContent = `Training with ${videosBatch.length} videos!`;
-
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = '🚀 TURBO TRAIN NOW';
-          progressDiv.style.display = 'none';
-          progressBar.style.width = '0%';
-        }, 3000);
-      });
-    }
   }
 
   function searchAndAddEducationalVideos(videos, progressBar, progressText, btn) {
