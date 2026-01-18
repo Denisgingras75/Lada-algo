@@ -1,6 +1,9 @@
 (function() {
   'use strict';
 
+  // IMMEDIATE LOG - verify script is loading
+  console.log('[Focus Feed] 🚀 Content script loaded!', window.location.href);
+
   let trainingEnabled = true;
   let selectedPersona = 'common-sense';
   let trainingIntensity = 80;
@@ -11,6 +14,8 @@
   let observer = null;
   const hostname = window.location.hostname;
   let currentPlatform = null;
+
+  console.log('[Focus Feed] Hostname:', hostname);
 
   // Detect platform
   if (hostname.includes('youtube.com')) {
@@ -132,6 +137,16 @@
   });
 
   function init() {
+    console.log('[Focus Feed] Init called - enabled:', trainingEnabled, 'platform:', currentPlatform);
+
+    // ALWAYS create debug panel so user can see what's happening
+    try {
+      createDebugPanel();
+      console.log('[Focus Feed] Debug panel created successfully');
+    } catch (error) {
+      console.error('[Focus Feed] Error creating debug panel:', error);
+    }
+
     if (!trainingEnabled) {
       console.log('[Focus Feed] Training disabled');
       return;
@@ -139,12 +154,12 @@
 
     if (!currentPlatform) {
       console.log('[Focus Feed] Unsupported platform:', hostname);
+      console.log('[Focus Feed] Extension will not scan content on this site');
       return;
     }
 
     console.log(`[Focus Feed] 🎯 Active - ${filterMode.toUpperCase()} mode on ${currentPlatform}`);
 
-    createDebugPanel();
     startScanning();
   }
 
