@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Focus Feed - Smart Filter",
-  "version": "8.2.0",
-  "description": "SMART MODE: Remove junk, keep your interests on YouTube, Facebook, Instagram & Twitter. 6 personas with 500+ keywords. MEGA MODE: Nuclear reset.",
+  "version": "8.3.0",
+  "description": "SMART MODE: Remove junk, keep your interests on YouTube, Facebook, Instagram, Twitter & Reddit. 6 personas with 500+ keywords. MEGA MODE: Nuclear reset.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -41,9 +41,10 @@
         "*://*.instagram.com/*",
         "*://*.twitter.com/*",
         "*://*.x.com/*",
-        "*://*.tiktok.com/*"
+        "*://*.tiktok.com/*",
+        "*://*.reddit.com/*"
       ],
-      "js": ["content.js"], 
+      "js": ["content.js"],
       "run_at": "document_end"
     }
   ]

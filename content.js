@@ -21,6 +21,8 @@
     currentPlatform = 'instagram';
   } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
     currentPlatform = 'twitter';
+  } else if (hostname.includes('reddit.com')) {
+    currentPlatform = 'reddit';
   }
 
   console.log(`[Focus Feed] Platform detected: ${currentPlatform || 'unsupported'}`);
@@ -176,6 +178,9 @@
         break;
       case 'twitter':
         handleTwitter();
+        break;
+      case 'reddit':
+        handleReddit();
         break;
     }
   }
@@ -359,6 +364,71 @@
     console.log(`[Focus Feed] X: "${text.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
 
     applyClassification(tweetElement, text, classification, 'twitter');
+  }
+
+  // ==================== REDDIT ====================
+  function handleReddit() {
+    console.log('[Focus Feed] Scanning Reddit...');
+
+    // Reddit post selectors (new and old Reddit)
+    const posts = document.querySelectorAll(
+      'shreddit-post, ' +                    // New Reddit
+      'div[data-testid="post-container"], ' + // New Reddit alternative
+      'div.Post, ' +                          // Old Reddit
+      'div[data-click-id="body"]'            // Old Reddit alternative
+    );
+
+    console.log(`[Focus Feed] Found ${posts.length} Reddit posts`);
+
+    posts.forEach(post => processRedditPost(post));
+  }
+
+  function processRedditPost(postElement) {
+    if (processedElements.has(postElement)) return;
+    processedElements.add(postElement);
+
+    // Try to find post title and content
+    const titleElement = postElement.querySelector(
+      'h1, ' +                                       // New Reddit
+      'a[slot="title"], ' +                          // New Reddit alternative
+      'h3.PostHeader__post-title-line, ' +          // Old Reddit
+      'h3 a.title, ' +                               // Old Reddit alternative
+      '[data-adclicklocation="title"]'              // Old Reddit
+    );
+
+    const textElements = postElement.querySelectorAll(
+      'div[slot="text-body"], ' +                    // New Reddit
+      'div.RichTextJSON-root, ' +                    // Old Reddit
+      'div.md, ' +                                   // Old Reddit markdown
+      'div[data-click-id="text"]'                    // Old Reddit alternative
+    );
+
+    let title = titleElement ? titleElement.textContent.trim() : '';
+    let bodyText = '';
+    textElements.forEach(el => {
+      const content = el.textContent?.trim() || '';
+      if (content.length > bodyText.length) bodyText = content;
+    });
+
+    const fullText = `${title} ${bodyText}`;
+
+    if (!title || title.length < 5) {
+      console.log('[Focus Feed] Reddit post has no title or too short');
+      return;
+    }
+
+    // Get subreddit if possible
+    const subredditElement = postElement.querySelector(
+      'a[slot="subreddit-prefixed-name"], ' +        // New Reddit
+      'faceplate-tracker[source="community_menu"] a, ' + // New Reddit alt
+      'a.subreddit'                                  // Old Reddit
+    );
+    const subreddit = subredditElement ? subredditElement.textContent.trim() : '';
+
+    const classification = classifyContent(fullText, subreddit);
+    console.log(`[Focus Feed] Reddit: "${title.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
+
+    applyClassification(postElement, title, classification, 'reddit');
   }
 
   // ==================== CLASSIFICATION ====================
