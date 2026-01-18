@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Focus Feed - Smart Filter",
-  "version": "8.0.0",
-  "description": "SMART MODE: Remove junk, keep your interests. MEGA MODE: Nuclear algorithm reset. Your feed, minus the garbage.",
+  "version": "8.1.0",
+  "description": "SMART MODE: Remove junk, keep your interests on YouTube, Facebook, Instagram & Twitter. MEGA MODE: Nuclear reset. Your feed, minus the garbage.",
   "permissions": [
     "activeTab",
     "scripting",

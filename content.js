@@ -4,12 +4,26 @@
   let trainingEnabled = true;
   let selectedPersona = 'common-sense';
   let trainingIntensity = 80;
-  let filterMode = 'smart'; // NEW: 'smart' or 'mega'
+  let filterMode = 'smart';
   let processedElements = new Set();
   let stats = { liked: 0, hidden: 0, neutral: 0 };
   let debugPanel = null;
   let observer = null;
   const hostname = window.location.hostname;
+  let currentPlatform = null;
+
+  // Detect platform
+  if (hostname.includes('youtube.com')) {
+    currentPlatform = 'youtube';
+  } else if (hostname.includes('facebook.com')) {
+    currentPlatform = 'facebook';
+  } else if (hostname.includes('instagram.com')) {
+    currentPlatform = 'instagram';
+  } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+    currentPlatform = 'twitter';
+  }
+
+  console.log(`[Focus Feed] Platform detected: ${currentPlatform || 'unsupported'}`);
 
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -23,10 +37,11 @@
     return true;
   });
 
-  // Function to PLAY and LIKE video (stronger signal)
+  // Function to PLAY and LIKE video (YouTube only)
   function playAndLikeVideo() {
+    if (currentPlatform !== 'youtube') return false;
+
     try {
-      // First, try to play the video
       const playButton = document.querySelector('button.ytp-play-button');
       const video = document.querySelector('video');
 
@@ -37,7 +52,6 @@
         playButton.click();
       }
 
-      // Then like it (after 2 second delay)
       setTimeout(() => {
         const likeButton = document.querySelector(
           'like-button-view-model button[aria-label*="like"], ' +
@@ -51,7 +65,6 @@
         }
       }, 2000);
 
-      // ALSO SUBSCRIBE to channel (even stronger signal)
       setTimeout(() => {
         const subscribeButton = document.querySelector(
           'ytd-subscribe-button-renderer button[aria-label*="Subscribe"], ' +
@@ -71,8 +84,9 @@
     }
   }
 
-  // Function to like video when on video watch page
   function likeCurrentVideoPage() {
+    if (currentPlatform !== 'youtube') return false;
+
     try {
       const likeButton = document.querySelector(
         'like-button-view-model button[aria-label*="like"], ' +
@@ -97,9 +111,9 @@
     trainingEnabled = result.focusEnabled !== undefined ? result.focusEnabled : true;
     selectedPersona = result.selectedPersona || 'common-sense';
     trainingIntensity = result.trainingIntensity !== undefined ? result.trainingIntensity : 80;
-    filterMode = result.filterMode || 'smart'; // Default to SMART MODE
+    filterMode = result.filterMode || 'smart';
 
-    console.log(`[Focus Feed] Loaded - Mode: ${filterMode.toUpperCase()}, Persona: ${selectedPersona}, Intensity: ${trainingIntensity}%`);
+    console.log(`[Focus Feed] Loaded - Mode: ${filterMode.toUpperCase()}, Persona: ${selectedPersona}, Platform: ${currentPlatform}`);
 
     init();
   });
@@ -121,17 +135,495 @@
       return;
     }
 
-    console.log(`[Focus Feed] 🎯 Active - ${selectedPersona} persona`);
+    if (!currentPlatform) {
+      console.log('[Focus Feed] Unsupported platform:', hostname);
+      return;
+    }
+
+    console.log(`[Focus Feed] 🎯 Active - ${filterMode.toUpperCase()} mode on ${currentPlatform}`);
 
     createDebugPanel();
+    startScanning();
+  }
 
-    if (hostname.includes('youtube.com')) {
-      handleYouTube();
-      startObserver();
+  function startScanning() {
+    // Initial scan
+    setTimeout(() => {
+      scanPlatform();
+    }, 2000); // Give page time to load
+
+    // Start observer for new content
+    startObserver();
+
+    // Periodic rescan (backup for missed mutations)
+    setInterval(() => {
+      scanPlatform();
+    }, 5000);
+  }
+
+  function scanPlatform() {
+    if (!trainingEnabled) return;
+
+    switch(currentPlatform) {
+      case 'youtube':
+        handleYouTube();
+        break;
+      case 'facebook':
+        handleFacebook();
+        break;
+      case 'instagram':
+        handleInstagram();
+        break;
+      case 'twitter':
+        handleTwitter();
+        break;
     }
   }
 
-  // Debug panel
+  // ==================== YOUTUBE ====================
+  function handleYouTube() {
+    console.log('[Focus Feed] Scanning YouTube...');
+
+    // Updated selectors for current YouTube DOM
+    const videos = document.querySelectorAll(
+      'ytd-rich-item-renderer, ' +
+      'ytd-video-renderer, ' +
+      'ytd-grid-video-renderer, ' +
+      'ytd-compact-video-renderer, ' +
+      'ytd-playlist-video-renderer'
+    );
+
+    console.log(`[Focus Feed] Found ${videos.length} YouTube videos`);
+
+    videos.forEach(video => processYouTubeVideo(video));
+  }
+
+  function processYouTubeVideo(videoElement) {
+    if (processedElements.has(videoElement)) return;
+    processedElements.add(videoElement);
+
+    const titleElement = videoElement.querySelector('#video-title, #video-title-link, a#video-title');
+    const channelElement = videoElement.querySelector('#channel-name a, #text.ytd-channel-name a, ytd-channel-name a');
+
+    if (!titleElement) {
+      console.log('[Focus Feed] YouTube video missing title element');
+      return;
+    }
+
+    const title = titleElement.textContent?.trim() || titleElement.getAttribute('title') || '';
+    const channel = channelElement ? channelElement.textContent.trim() : '';
+
+    if (!title) {
+      console.log('[Focus Feed] YouTube video has empty title');
+      return;
+    }
+
+    const classification = classifyContent(title, channel);
+    console.log(`[Focus Feed] YT: "${title.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
+
+    applyClassification(videoElement, title, classification, 'youtube');
+  }
+
+  // ==================== FACEBOOK ====================
+  function handleFacebook() {
+    console.log('[Focus Feed] Scanning Facebook...');
+
+    // Facebook post selectors (updated for current FB DOM)
+    const posts = document.querySelectorAll(
+      'div[data-pagelet^="FeedUnit"], ' +
+      'div[role="article"], ' +
+      'div.x1yztbdb.x1n2onr6.xh8yej3.x1ja2u2z'
+    );
+
+    console.log(`[Focus Feed] Found ${posts.length} Facebook posts`);
+
+    posts.forEach(post => processFacebookPost(post));
+  }
+
+  function processFacebookPost(postElement) {
+    if (processedElements.has(postElement)) return;
+    processedElements.add(postElement);
+
+    // Try to find post text content
+    const textElements = postElement.querySelectorAll(
+      'div[data-ad-preview="message"], ' +
+      'div[data-ad-comet-preview="message"], ' +
+      'div.xdj266r.x11i5rnm.xat24cr.x1mh8g0r.x1vvkbs, ' +
+      'div[dir="auto"]'
+    );
+
+    let text = '';
+    textElements.forEach(el => {
+      const content = el.textContent?.trim() || '';
+      if (content.length > text.length) text = content;
+    });
+
+    // Get author if possible
+    const authorElement = postElement.querySelector(
+      'a[role="link"] strong, ' +
+      'h2 a, ' +
+      'h3 a, ' +
+      'h4 a'
+    );
+    const author = authorElement ? authorElement.textContent.trim() : '';
+
+    if (!text || text.length < 10) {
+      console.log('[Focus Feed] FB post too short or empty');
+      return;
+    }
+
+    const classification = classifyContent(text, author);
+    console.log(`[Focus Feed] FB: "${text.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
+
+    applyClassification(postElement, text, classification, 'facebook');
+  }
+
+  // ==================== INSTAGRAM ====================
+  function handleInstagram() {
+    console.log('[Focus Feed] Scanning Instagram...');
+
+    // Instagram post selectors
+    const posts = document.querySelectorAll(
+      'article[role="presentation"], ' +
+      'div._aagu, ' +
+      'div._ab6k'
+    );
+
+    console.log(`[Focus Feed] Found ${posts.length} Instagram posts`);
+
+    posts.forEach(post => processInstagramPost(post));
+  }
+
+  function processInstagramPost(postElement) {
+    if (processedElements.has(postElement)) return;
+    processedElements.add(postElement);
+
+    // Try to find caption
+    const captionElement = postElement.querySelector(
+      'h1._aacl._aacs._aact._aacx._aada, ' +
+      'span._aacl._aaco._aacu._aacx._aad7._aade, ' +
+      'div.C4VMK > span'
+    );
+
+    const caption = captionElement ? captionElement.textContent.trim() : '';
+
+    // Get username
+    const usernameElement = postElement.querySelector(
+      'a.x1i10hfl.xjbqb8w.x6umtig.x1b1mbwd.xaqea5y.xav7gou.x9f619.x1ypdohk.xt0psk2.xe8uvvx.xdj266r.x11i5rnm.xat24cr.x1mh8g0r.xexx8yu.x4uap5.x18d9i69.xkhd6sd.x16tdsg8.x1hl2dhg.xggy1nq.x1a2a7pz._acan._acao._acat._acaw._aj1-, ' +
+      'span.x1lliihq.x1plvlek.xryxfnj.x1n2onr6.x193iq5w.xeuugli.x1fj9vlw.x13faqbe.x1vvkbs.x1s928wv.xhkezso.x1gmr53x.x1cpjm7i.x1fgarty.x1943h6x.x1i0vuye.xvs91rp.xo1l8bm.x5n08af.x10wh9bi.x1wdrske.x8viiok.x18hxmgj'
+    );
+    const username = usernameElement ? usernameElement.textContent.trim() : '';
+
+    if (!caption || caption.length < 5) {
+      console.log('[Focus Feed] IG post has no caption or too short');
+      return;
+    }
+
+    const classification = classifyContent(caption, username);
+    console.log(`[Focus Feed] IG: "${caption.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
+
+    applyClassification(postElement, caption, classification, 'instagram');
+  }
+
+  // ==================== TWITTER ====================
+  function handleTwitter() {
+    console.log('[Focus Feed] Scanning Twitter/X...');
+
+    const tweets = document.querySelectorAll(
+      'article[data-testid="tweet"], ' +
+      'div[data-testid="cellInnerDiv"]'
+    );
+
+    console.log(`[Focus Feed] Found ${tweets.length} tweets`);
+
+    tweets.forEach(tweet => processTwitterPost(tweet));
+  }
+
+  function processTwitterPost(tweetElement) {
+    if (processedElements.has(tweetElement)) return;
+    processedElements.add(tweetElement);
+
+    const textElement = tweetElement.querySelector(
+      'div[data-testid="tweetText"], ' +
+      'div[lang]'
+    );
+
+    const text = textElement ? textElement.textContent.trim() : '';
+
+    if (!text || text.length < 10) {
+      console.log('[Focus Feed] Tweet too short or empty');
+      return;
+    }
+
+    const classification = classifyContent(text, '');
+    console.log(`[Focus Feed] X: "${text.substring(0, 50)}..." → ${classification} (${filterMode} mode)`);
+
+    applyClassification(tweetElement, text, classification, 'twitter');
+  }
+
+  // ==================== CLASSIFICATION ====================
+  function applyClassification(element, text, classification, platform) {
+    // SMART MODE: Focus on removing junk, suggest educational, leave neutral alone
+    if (filterMode === 'smart') {
+      if (classification === 'junk') {
+        hideContent(element, text, platform);
+        stats.hidden++;
+        updateDebugPanel(`❌ Removed junk: ${text.substring(0, 40)}...`);
+      } else if (classification === 'educational') {
+        suggestEducational(element, text, platform);
+        stats.liked++;
+        updateDebugPanel(`✅ Suggested: ${text.substring(0, 40)}...`);
+      } else {
+        stats.neutral++;
+        updateDebugPanel(`○ Passed: ${text.substring(0, 40)}...`);
+      }
+    }
+    // MEGA MODE: Nuclear option - force educational, hide junk aggressively
+    else if (filterMode === 'mega') {
+      if (classification === 'educational' && trainingIntensity >= 30) {
+        markEducational(element, text, platform);
+        stats.liked++;
+        updateDebugPanel(`✅ Training: ${text.substring(0, 40)}...`);
+      } else if (classification === 'junk' && trainingIntensity >= 70) {
+        hideContent(element, text, platform);
+        stats.hidden++;
+        updateDebugPanel(`❌ Hiding: ${text.substring(0, 40)}...`);
+      } else {
+        stats.neutral++;
+        updateDebugPanel(`Checked: ${text.substring(0, 40)}...`);
+      }
+    }
+
+    chrome.storage.local.set({ sessionStats: stats });
+  }
+
+  // ==================== ACTIONS ====================
+
+  // SMART MODE: Gentle educational suggestion
+  function suggestEducational(element, text, platform) {
+    element.style.border = '1px solid rgba(74, 222, 128, 0.5)';
+    element.style.borderRadius = '8px';
+
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(74, 222, 128, 0.9);
+      color: #000;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      z-index: 100;
+      pointer-events: none;
+    `;
+    badge.textContent = '📚 Educational';
+
+    // Make element position relative so badge positions correctly
+    if (element.style.position === '' || element.style.position === 'static') {
+      element.style.position = 'relative';
+    }
+
+    element.appendChild(badge);
+  }
+
+  // MEGA MODE: Aggressive educational marking
+  function markEducational(element, text, platform) {
+    element.style.border = '2px solid #4ade80';
+    element.style.borderRadius = '8px';
+
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #4ade80;
+      color: #000;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      z-index: 100;
+      pointer-events: none;
+    `;
+    badge.textContent = '✓ Educational';
+
+    if (element.style.position === '' || element.style.position === 'static') {
+      element.style.position = 'relative';
+    }
+
+    element.appendChild(badge);
+
+    // Platform-specific auto-like logic
+    if (platform === 'youtube') {
+      const videoUrl = element.querySelector('#video-title')?.getAttribute('href');
+      if (videoUrl) {
+        chrome.runtime.sendMessage({
+          action: 'likeVideo',
+          videoUrl: videoUrl,
+          title: text
+        });
+      }
+    }
+  }
+
+  // Hide junk content
+  function hideContent(element, text, platform) {
+    element.style.transition = 'opacity 0.5s, filter 0.5s';
+    element.style.opacity = '0.2';
+    element.style.filter = 'grayscale(100%)';
+
+    const badge = document.createElement('div');
+    badge.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 75, 87, 0.9);
+      color: white;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      z-index: 100;
+      pointer-events: none;
+    `;
+    badge.textContent = '❌ Junk';
+
+    if (element.style.position === '' || element.style.position === 'static') {
+      element.style.position = 'relative';
+    }
+
+    element.appendChild(badge);
+
+    // Try to click "not interested" on YouTube
+    if (platform === 'youtube') {
+      setTimeout(() => {
+        const menuButton = element.querySelector('button[aria-label="Action menu"], button#button[aria-label*="menu"]');
+        if (menuButton) {
+          try {
+            menuButton.click();
+            setTimeout(() => {
+              const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-listbox ytd-menu-service-item-renderer');
+              for (let item of menuItems) {
+                const itemText = item.textContent.toLowerCase();
+                if (itemText.includes('not interested') || itemText.includes('don\'t recommend')) {
+                  console.log(`[Focus Feed] ✓ Clicking "Not interested" on: ${text}`);
+                  item.click();
+                  break;
+                }
+              }
+            }, 300);
+          } catch (error) {
+            console.error('[Focus Feed] Error hiding YouTube video:', error);
+          }
+        }
+      }, 100);
+    }
+  }
+
+  function classifyContent(title, channel) {
+    const text = `${title} ${channel}`.toLowerCase();
+    const rules = getPersonaRules(selectedPersona);
+
+    // Check educational keywords
+    for (let keyword of rules.educational) {
+      if (text.includes(keyword.toLowerCase())) {
+        return 'educational';
+      }
+    }
+
+    // Check junk keywords
+    for (let keyword of rules.junk) {
+      if (text.includes(keyword.toLowerCase())) {
+        return 'junk';
+      }
+    }
+
+    return 'neutral';
+  }
+
+  function getPersonaRules(persona) {
+    const allRules = {
+      'common-sense': {
+        educational: [
+          // Practical skills
+          'how to', 'tutorial', 'guide', 'explained', 'learn', 'teach', 'education',
+          'lesson', 'course', 'masterclass', 'fundamentals', 'basics', 'advanced',
+          'step by step', 'beginner guide', 'complete guide', 'full course',
+          'deep dive', 'breakdown', 'analysis', 'review', 'critical thinking',
+
+          // Life skills
+          'productivity', 'self improvement', 'personal development', 'habits',
+          'time management', 'problem solving', 'decision making',
+          'communication skills', 'public speaking', 'writing skills', 'reading',
+
+          // Finance & career
+          'financial literacy', 'budgeting', 'investing', 'career advice', 'resume',
+          'interview tips', 'negotiation', 'salary', 'retirement', 'taxes',
+
+          // Health & wellness
+          'nutrition', 'exercise', 'mental health', 'sleep', 'stress management',
+          'mindfulness', 'meditation', 'therapy', 'psychology', 'neuroscience',
+
+          // General knowledge
+          'history', 'geography', 'science', 'technology', 'current events',
+          'documentary', 'informative', 'educational', 'factual', 'evidence based',
+
+          // Trusted sources
+          'NPR', 'BBC', 'PBS', 'National Geographic', 'Scientific American',
+          'The Economist', 'Wall Street Journal', 'New York Times', 'Reuters'
+        ],
+        junk: [
+          // Clickbait phrases
+          'YOU WON\'T BELIEVE', 'SHOCKING', 'UNBELIEVABLE', 'INSANE', 'CRAZY',
+          'MIND BLOWING', 'MUST SEE', 'MUST WATCH', 'THIS WILL CHANGE',
+          'LIFE CHANGING', 'GAME CHANGER', 'SECRET REVEALED', 'THEY DON\'T WANT',
+          'GONE WRONG', 'GONE SEXUAL', 'ALMOST DIED', 'EMOTIONAL', 'IN TEARS',
+
+          // Drama & gossip
+          'drama', 'tea', 'spill', 'exposed', 'cancelled', 'beef', 'diss track',
+          'shade', 'feud', 'fight', 'destroyed', 'roasted', 'cringe', 'react',
+
+          // Low effort content
+          'prank', 'challenge', 'mukbang', 'haul', 'unboxing', 'vlog', 'vlogging',
+          '24 hours', 'last to', 'who can', 'vs', 'versus', 'battle',
+
+          // Misinformation
+          'flat earth', 'conspiracy', 'illuminati', 'reptilian', 'fake moon landing',
+          'chemtrails', 'anti vax', 'miracle cure', 'doctors hate', 'big pharma',
+
+          // Toxic patterns
+          'DESTROYING', 'OBLITERATES', 'ANNIHILATES', 'OWNS', 'WRECKS', 'SLAMS'
+        ]
+      }
+    };
+
+    return allRules[persona] || allRules['common-sense'];
+  }
+
+  // ==================== OBSERVER ====================
+  let observerTimeout = null;
+  function startObserver() {
+    if (observer) observer.disconnect();
+
+    observer = new MutationObserver(() => {
+      clearTimeout(observerTimeout);
+      observerTimeout = setTimeout(() => {
+        console.log('[Focus Feed] Content changed, rescanning...');
+        scanPlatform();
+      }, 300); // Faster response: 300ms instead of 1000ms
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    console.log('[Focus Feed] ✓ Observer started (300ms debounce)');
+  }
+
+  // ==================== DEBUG PANEL ====================
   function createDebugPanel() {
     if (debugPanel) return;
 
@@ -147,7 +639,7 @@
       border-radius: 10px;
       font-family: Arial, sans-serif;
       font-size: 12px;
-      z-index: 10000;
+      z-index: 999999;
       min-width: 250px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     `;
@@ -157,6 +649,7 @@
       <div style="margin-bottom: 5px;">
         <span style="font-size: 12px; font-weight: bold; color: #4ade80;">Mode: <span id="ff-mode">${filterMode.toUpperCase()}</span></span>
       </div>
+      <div style="margin-bottom: 5px; font-size: 11px;">Platform: <span id="ff-platform">${currentPlatform || 'unknown'}</span></div>
       <div style="margin-bottom: 5px; font-size: 11px;">Persona: <span id="ff-persona">${selectedPersona}</span></div>
       <div style="margin-bottom: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
         <div style="margin-bottom: 3px;">✅ Educational: <span id="ff-educational">0</span></div>
@@ -203,22 +696,16 @@
     document.body.appendChild(debugPanel);
     console.log('[Focus Feed] ✓ Debug panel created');
 
-    // Add mode toggle button click handler
     document.getElementById('ff-mode-toggle').addEventListener('click', toggleFilterMode);
-
-    // Add turbo button click handler
     document.getElementById('ff-turbo-btn').addEventListener('click', activateTurboMode);
   }
 
-  // Toggle between SMART and MEGA modes
   function toggleFilterMode() {
     const newMode = filterMode === 'smart' ? 'mega' : 'smart';
     filterMode = newMode;
 
-    // Save to storage
     chrome.storage.sync.set({ filterMode: newMode });
 
-    // Update UI
     const modeEl = document.getElementById('ff-mode');
     const modeBtn = document.getElementById('ff-mode-toggle');
     const modeDesc = modeBtn.nextElementSibling;
@@ -257,482 +744,6 @@
     }
   }
 
-  // YOUTUBE MODULE
-  function handleYouTube() {
-    console.log('[Focus Feed] Scanning YouTube...');
-
-    const videos = document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer');
-    console.log(`[Focus Feed] Found ${videos.length} videos`);
-
-    videos.forEach(video => processYouTubeVideo(video));
-  }
-
-  function processYouTubeVideo(videoElement) {
-    if (processedElements.has(videoElement)) return;
-    processedElements.add(videoElement);
-
-    const titleElement = videoElement.querySelector('#video-title');
-    const channelElement = videoElement.querySelector('#channel-name a, #text.ytd-channel-name a');
-
-    if (!titleElement) return;
-
-    const title = titleElement.textContent.trim();
-    const channel = channelElement ? channelElement.textContent.trim() : '';
-    const classification = classifyContent(title, channel);
-
-    console.log(`[Focus Feed] "${title}" → ${classification} (${filterMode} mode)`);
-
-    // SMART MODE: Focus on removing junk, suggest educational, leave neutral alone
-    if (filterMode === 'smart') {
-      if (classification === 'junk') {
-        // ALWAYS hide junk in SMART MODE (no intensity check)
-        hideJunk(videoElement, title);
-        stats.hidden++;
-        updateDebugPanel(`❌ Removed junk: ${title.substring(0, 40)}...`);
-      } else if (classification === 'educational') {
-        // Gently suggest educational (light border, no auto-like)
-        suggestEducational(videoElement, title);
-        stats.liked++;
-        updateDebugPanel(`✅ Suggested: ${title.substring(0, 40)}...`);
-      } else {
-        // Neutral = user's interests, let it through
-        stats.neutral++;
-        updateDebugPanel(`○ Passed: ${title.substring(0, 40)}...`);
-      }
-    }
-    // MEGA MODE: Nuclear option - force educational, hide junk aggressively
-    else if (filterMode === 'mega') {
-      if (classification === 'educational' && trainingIntensity >= 30) {
-        markEducational(videoElement, title);
-        stats.liked++;
-        updateDebugPanel(`✅ Training: ${title.substring(0, 40)}...`);
-      } else if (classification === 'junk' && trainingIntensity >= 70) {
-        hideJunk(videoElement, title);
-        stats.hidden++;
-        updateDebugPanel(`❌ Hiding: ${title.substring(0, 40)}...`);
-      } else {
-        stats.neutral++;
-        updateDebugPanel(`Checked: ${title.substring(0, 40)}...`);
-      }
-    }
-
-    // Update stats storage
-    chrome.storage.local.set({ sessionStats: stats });
-  }
-
-  // SMART MODE: Gentle educational suggestion (no auto-like)
-  function suggestEducational(videoElement, title) {
-    // Light green border (less aggressive than MEGA mode)
-    videoElement.style.border = '1px solid rgba(74, 222, 128, 0.5)';
-    videoElement.style.borderRadius = '8px';
-
-    // Add subtle badge
-    const badge = document.createElement('div');
-    badge.style.cssText = `
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(74, 222, 128, 0.9);
-      color: #000;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: bold;
-      z-index: 100;
-    `;
-    badge.textContent = '📚 Educational';
-
-    const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
-    if (thumbnail) {
-      thumbnail.style.position = 'relative';
-      thumbnail.appendChild(badge);
-    }
-
-    // NO auto-like in SMART MODE - just suggest
-  }
-
-  // MEGA MODE: Aggressive educational marking (with auto-like)
-  function markEducational(videoElement, title) {
-    videoElement.style.border = '2px solid #4ade80';
-    videoElement.style.borderRadius = '8px';
-
-    const videoUrl = videoElement.querySelector('#video-title')?.getAttribute('href');
-    if (videoUrl) {
-      // Send to background to open and like
-      chrome.runtime.sendMessage({
-        action: 'likeVideo',
-        videoUrl: videoUrl,
-        title: title
-      });
-    }
-
-    // Add badge
-    const badge = document.createElement('div');
-    badge.style.cssText = `
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: #4ade80;
-      color: #000;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
-      z-index: 100;
-    `;
-    badge.textContent = '✓ Educational';
-
-    const thumbnail = videoElement.querySelector('ytd-thumbnail, #thumbnail');
-    if (thumbnail) {
-      thumbnail.style.position = 'relative';
-      thumbnail.appendChild(badge);
-    }
-  }
-
-  function hideJunk(videoElement, title) {
-    const menuButton = videoElement.querySelector('button[aria-label="Action menu"], button#button[aria-label*="menu"]');
-
-    if (menuButton) {
-      try {
-        menuButton.click();
-
-        setTimeout(() => {
-          const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-listbox ytd-menu-service-item-renderer');
-
-          for (let item of menuItems) {
-            const text = item.textContent.toLowerCase();
-            if (text.includes('not interested') || text.includes('don\'t recommend')) {
-              console.log(`[Focus Feed] ✓ Clicking "Not interested" on: ${title}`);
-              item.click();
-              break;
-            }
-          }
-        }, 300);
-      } catch (error) {
-        console.error('[Focus Feed] Error hiding video:', error);
-      }
-    }
-
-    // Visual hiding
-    videoElement.style.transition = 'opacity 0.5s';
-    videoElement.style.opacity = '0.2';
-    videoElement.style.filter = 'grayscale(100%)';
-  }
-
-  function classifyContent(title, channel) {
-    const text = `${title} ${channel}`.toLowerCase();
-
-    const rules = getPersonaRules(selectedPersona);
-
-    // Check educational keywords
-    for (let keyword of rules.educational) {
-      if (text.includes(keyword.toLowerCase())) {
-        return 'educational';
-      }
-    }
-
-    // Check junk keywords
-    for (let keyword of rules.junk) {
-      if (text.includes(keyword.toLowerCase())) {
-        return 'junk';
-      }
-    }
-
-    return 'neutral';
-  }
-
-  function getPersonaRules(persona) {
-    const allRules = {
-      'common-sense': {
-        educational: [
-          // Practical skills
-          'how to', 'tutorial', 'guide', 'explained', 'learn', 'teach', 'education',
-          'lesson', 'course', 'masterclass', 'fundamentals', 'basics', 'advanced',
-          'step by step', 'beginner guide', 'complete guide', 'full course',
-          'deep dive', 'breakdown', 'analysis', 'review', 'critical thinking',
-
-          // Life skills
-          'productivity', 'self improvement', 'personal development', 'habits',
-          'time management', 'critical thinking', 'problem solving', 'decision making',
-          'communication skills', 'public speaking', 'writing skills', 'reading',
-
-          // Finance & career
-          'financial literacy', 'budgeting', 'investing', 'career advice', 'resume',
-          'interview tips', 'negotiation', 'salary', 'retirement', 'taxes',
-
-          // Health & wellness
-          'nutrition', 'exercise', 'mental health', 'sleep', 'stress management',
-          'mindfulness', 'meditation', 'therapy', 'psychology', 'neuroscience',
-
-          // General knowledge
-          'history', 'geography', 'science', 'technology', 'current events',
-          'documentary', 'informative', 'educational', 'factual', 'evidence based',
-
-          // Trusted sources
-          'NPR', 'BBC', 'PBS', 'National Geographic', 'Scientific American',
-          'The Economist', 'Wall Street Journal', 'New York Times', 'Reuters'
-        ],
-        junk: [
-          // Clickbait phrases
-          'YOU WON\'T BELIEVE', 'SHOCKING', 'UNBELIEVABLE', 'INSANE', 'CRAZY',
-          'MIND BLOWING', 'MUST SEE', 'MUST WATCH', 'THIS WILL CHANGE',
-          'LIFE CHANGING', 'GAME CHANGER', 'SECRET REVEALED', 'THEY DON\'T WANT',
-          'GONE WRONG', 'GONE SEXUAL', 'ALMOST DIED', 'EMOTIONAL', 'IN TEARS',
-
-          // Drama & gossip
-          'drama', 'tea', 'spill', 'exposed', 'cancelled', 'beef', 'diss track',
-          'shade', 'feud', 'fight', 'destroyed', 'roasted', 'cringe', 'react',
-
-          // Low effort content
-          'prank', 'challenge', 'mukbang', 'haul', 'unboxing', 'vlog', 'vlogging',
-          '24 hours', 'last to', 'who can', 'vs', 'versus', 'battle',
-
-          // Misinformation
-          'flat earth', 'conspiracy', 'illuminati', 'reptilian', 'fake moon landing',
-          'chemtrails', 'anti vax', 'miracle cure', 'doctors hate', 'big pharma',
-
-          // Toxic patterns
-          'DESTROYING', 'OBLITERATES', 'ANNIHILATES', 'OWNS', 'WRECKS', 'SLAMS'
-        ]
-      },
-
-      polymath: {
-        educational: [
-          // Universities & Institutions (expanded)
-          'MIT', 'Stanford', 'Harvard', 'Yale', 'Princeton', 'Berkeley', 'Caltech',
-          'Oxford', 'Cambridge', 'Imperial College', 'ETH Zurich', 'Carnegie Mellon',
-          'Columbia', 'Cornell', 'Duke', 'Johns Hopkins', 'Northwestern', 'Penn',
-          'University of Chicago', 'UCLA', 'Michigan', 'UC Berkeley', 'UT Austin',
-
-          // Educational Channels (massive expansion)
-          'Khan Academy', 'TED', 'TED-Ed', 'TEDx', 'Crash Course', 'CrashCourse',
-          'Veritasium', 'Kurzgesagt', 'SmarterEveryDay', 'Vsauce', 'Vsauce2', 'Vsauce3',
-          '3Blue1Brown', 'Numberphile', 'Computerphile', 'Periodic Videos',
-          'MinutePhysics', 'MinuteEarth', 'AsapSCIENCE', 'SciShow', 'PBS Space Time',
-          'PBS Eons', 'Physics Girl', 'ElectroBOOM', 'NileRed', 'NileBlue',
-          'Steve Mould', 'Mark Rober', 'Tom Scott', 'CGP Grey', 'Wendover',
-          'Real Engineering', 'Practical Engineering', 'Technology Connections',
-          'Up and Atom', 'Looking Glass Universe', 'Domain of Science',
-          'Two Minute Papers', 'Lex Fridman', 'Andrew Huberman', 'Peter Attia',
-
-          // Content Type Phrases (multi-word strings)
-          'explained simply', 'explained in', 'how it works', 'introduction to',
-          'beginner guide', 'complete guide', 'full course', 'free course',
-          'online course', 'lecture series', 'lecture notes', 'study guide',
-          'learn in', 'master class', 'deep dive into', 'breakdown of',
-          'analysis of', 'understanding', 'comprehensive guide', 'step by step',
-          'from scratch', 'for beginners', 'fundamentals of', 'basics of',
-          'advanced', 'intermediate', 'tutorial series', 'educational video',
-          'documentary film', 'scientific explanation', 'research paper',
-          'peer reviewed', 'evidence based', 'data driven', 'case study',
-
-          // Academic Terms
-          'lecture', 'seminar', 'symposium', 'conference', 'presentation',
-          'dissertation', 'thesis', 'research', 'study', 'experiment', 'theory',
-          'hypothesis', 'methodology', 'empirical', 'quantitative', 'qualitative',
-
-          // Subjects (massive expansion)
-          // STEM
-          'physics', 'quantum physics', 'astrophysics', 'cosmology', 'astronomy',
-          'mathematics', 'calculus', 'linear algebra', 'differential equations',
-          'statistics', 'probability', 'number theory', 'topology', 'geometry',
-          'chemistry', 'organic chemistry', 'biochemistry', 'molecular biology',
-          'genetics', 'microbiology', 'neuroscience', 'cognitive science',
-          'computer science', 'algorithms', 'data structures', 'machine learning',
-          'artificial intelligence', 'programming', 'coding', 'software engineering',
-          'electrical engineering', 'mechanical engineering', 'civil engineering',
-
-          // Humanities & Social Sciences
-          'philosophy', 'ethics', 'epistemology', 'metaphysics', 'logic',
-          'history', 'world history', 'ancient history', 'medieval history',
-          'economics', 'microeconomics', 'macroeconomics', 'behavioral economics',
-          'psychology', 'sociology', 'anthropology', 'political science',
-          'linguistics', 'literature', 'poetry', 'rhetoric', 'critical theory',
-
-          // Arts & Culture
-          'art history', 'music theory', 'film analysis', 'architecture',
-          'classical music', 'opera', 'jazz theory', 'composition',
-
-          // Skills
-          'critical thinking', 'scientific method', 'logical reasoning',
-          'problem solving', 'analytical thinking', 'systems thinking',
-
-          // Formats
-          'documentary', 'educational', 'informative', 'instructional',
-          'academic', 'scholarly', 'intellectual', 'cerebral', 'rigorous'
-        ],
-        junk: [
-          // Extreme clickbait (expanded)
-          'YOU WON\'T BELIEVE', 'WILL SHOCK YOU', 'SHOCKING TRUTH', 'UNBELIEVABLE',
-          'MOST INSANE', 'CRAZIEST', 'WILDEST', 'MOST SHOCKING', 'INCREDIBLE',
-          'MIND BLOWING', 'MIND BLOWN', 'BLEW MY MIND', 'CHANGED MY LIFE',
-          'LIFE CHANGING', 'GAME CHANGER', 'EVERYTHING CHANGED', 'RUINED MY LIFE',
-          'ALMOST DIED', 'NEARLY KILLED', 'WENT HORRIBLY WRONG', 'TOTAL DISASTER',
-          'EPIC FAIL', 'FAIL COMPILATION', 'FAILS', 'FUNNY FAILS',
-
-          // Secret/conspiracy clickbait
-          'SECRET', 'SECRETS REVEALED', 'HIDDEN TRUTH', 'THEY DON\'T WANT YOU',
-          'THEY\'RE HIDING', 'COVER UP', 'EXPOSED', 'TRUTH EXPOSED',
-          'WHAT THEY DON\'T TELL YOU', 'INDUSTRY SECRET', 'LEAKED',
-
-          // Emotional manipulation
-          'EMOTIONAL', 'CRIED', 'IN TEARS', 'CRYING', 'HEARTBREAKING',
-          'WILL MAKE YOU CRY', 'SAD STORY', 'TOUCHING', 'INSPIRATIONAL FAIL',
-
-          // Drama & gossip (expanded)
-          'drama', 'tea', 'spilling tea', 'all the tea', 'drama alert',
-          'exposed', 'exposing', 'calling out', 'cancelled', 'cancel culture',
-          'beef', 'diss track', 'diss', 'shots fired', 'shade', 'throwing shade',
-          'feud', 'fight', 'argument', 'destroyed', 'roasted', 'roasting',
-          'cringe', 'cringe compilation', 'reaction', 'reacting to', 'react',
-          'commentary', 'my thoughts on', 'hot take', 'unpopular opinion',
-
-          // Low quality formats
-          'prank', 'pranking', 'prank war', 'epic prank', 'gone wrong',
-          'challenge', 'challenges', '24 hour challenge', '24 hours in',
-          'last to leave', 'last to', 'who can', 'trying', 'we tried',
-          'mukbang', 'eating', 'food challenge', 'taste test',
-          'haul', 'shopping haul', 'unboxing', 'unbox', 'first impressions',
-          'vlog', 'daily vlog', 'day in my life', 'vlogging',
-          'among us', 'fortnite', 'minecraft', 'roblox', 'tiktok',
-
-          // Versus/battle content
-          'vs', 'versus', 'battle', 'rap battle', 'roast battle',
-          'who wore it better', 'comparison', 'tier list',
-
-          // Misinformation & pseudoscience
-          'flat earth', 'flat earther', 'conspiracy', 'conspiracy theory',
-          'illuminati', 'reptilian', 'new world order', 'deep state',
-          'fake moon landing', 'moon landing hoax', 'chemtrails',
-          'anti vax', 'anti vaxx', 'vaccine injury', 'big pharma conspiracy',
-          'miracle cure', 'doctors hate this', 'one weird trick',
-          'detox', 'cleanse', 'toxins', 'manifesting', 'law of attraction',
-
-          // Toxic/aggressive language
-          'DESTROYING', 'DESTROYS', 'DESTROYED', 'OBLITERATES', 'OBLITERATED',
-          'ANNIHILATES', 'OWNS', 'OWNED', 'WRECKS', 'WRECKED', 'SLAMS',
-          'DEMOLISHES', 'CRUSHES', 'HUMILIATES', 'EMBARRASSES',
-
-          // Spam patterns
-          'LIKE AND SUBSCRIBE', 'SMASH THAT LIKE', 'HIT THE BELL',
-          'DON\'T FORGET TO', 'MAKE SURE TO', 'BEFORE YOU GO',
-          'WAIT UNTIL THE END', 'WATCH TILL THE END', 'ENDING WILL',
-
-          // Sexual/inappropriate
-          'GONE SEXUAL', 'SEXUAL', 'SEXY', 'HOT', 'THICC', 'THIRST TRAP',
-          'ONLY FANS', 'ONLYFANS', 'SPICY', 'NAUGHTY', 'INAPPROPRIATE'
-        ]
-      },
-
-      engineer: {
-        educational: [
-          // Programming languages & frameworks
-          'programming', 'coding', 'software engineering', 'development',
-          'Python', 'JavaScript', 'Java', 'C++', 'C#', 'Go', 'Rust', 'Swift',
-          'Kotlin', 'TypeScript', 'Ruby', 'PHP', 'SQL', 'R', 'Scala',
-          'React', 'Angular', 'Vue', 'Node', 'Django', 'Flask', 'Spring',
-          'TensorFlow', 'PyTorch', 'Kubernetes', 'Docker', 'AWS', 'Azure',
-
-          // CS Fundamentals
-          'algorithm', 'data structure', 'Big O', 'complexity', 'optimization',
-          'sorting', 'searching', 'graph', 'tree', 'linked list', 'hash table',
-          'dynamic programming', 'recursion', 'object oriented', 'functional',
-
-          // Educational channels
-          'CS50', 'freeCodeCamp', 'Traversy Media', 'The Net Ninja',
-          'Fireship', 'ThePrimeagen', 'Code Bullet', 'Computerphile',
-          'Hussein Nasser', 'Coding Train', 'Derek Banas', 'Sentdex',
-          'Tech With Tim', 'Corey Schafer', 'ArjanCodes', 'mCoding',
-
-          // Topics
-          'system design', 'architecture', 'design patterns', 'clean code',
-          'testing', 'debugging', 'refactoring', 'performance', 'security',
-          'database design', 'API design', 'microservices', 'DevOps',
-          'CI/CD', 'git', 'version control', 'agile', 'scrum',
-
-          // Learning phrases
-          'tutorial', 'course', 'bootcamp', 'project', 'build', 'create',
-          'explained', 'guide to', 'introduction to', 'how to build',
-          'step by step', 'from scratch', 'for beginners', 'crash course'
-        ],
-        junk: [
-          'SHOCKING', 'drama', 'exposed', 'GONE WRONG', 'clickbait',
-          'prank', 'challenge', 'react', 'roast', 'beef', 'cancelled',
-          'UNBELIEVABLE', 'INSANE', 'MIND BLOWING', 'SECRET', 'THEY HIDE',
-          'get rich quick', 'make money fast', 'easy money', 'passive income scam'
-        ]
-      },
-
-      strategist: {
-        educational: [
-          // Business & Strategy
-          'business', 'strategy', 'business strategy', 'competitive advantage',
-          'market analysis', 'business model', 'value proposition', 'disruption',
-          'innovation', 'entrepreneurship', 'startup', 'scale up', 'growth',
-
-          // Finance & Investing
-          'finance', 'investing', 'investment', 'stock market', 'portfolio',
-          'diversification', 'asset allocation', 'risk management', 'valuation',
-          'financial analysis', 'fundamental analysis', 'technical analysis',
-          'value investing', 'index fund', 'ETF', 'dividend', 'compound interest',
-
-          // Economics
-          'economics', 'microeconomics', 'macroeconomics', 'monetary policy',
-          'fiscal policy', 'supply and demand', 'market efficiency', 'game theory',
-          'behavioral economics', 'incentives', 'trade', 'globalization',
-
-          // Sources & Channels
-          'Y Combinator', 'Stanford Business', 'Harvard Business Review',
-          'Bloomberg', 'CNBC', 'Financial Times', 'Wall Street Journal',
-          'Warren Buffett', 'Charlie Munger', 'Ray Dalio', 'Peter Thiel',
-          'Naval Ravikant', 'Patrick O\'Shaughnessy', 'Ben Thompson',
-          'The Economist', 'McKinsey', 'BCG', 'Bain',
-
-          // Topics
-          'case study', 'business case', 'ROI', 'unit economics', 'metrics',
-          'KPI', 'OKR', 'product market fit', 'go to market', 'pricing',
-          'marketing', 'sales', 'operations', 'supply chain', 'logistics',
-          'management', 'leadership', 'negotiation', 'decision making',
-
-          // Learning phrases
-          'explained', 'analysis', 'breakdown', 'deep dive', 'framework',
-          'model', 'theory', 'principle', 'lesson', 'insight'
-        ],
-        junk: [
-          'get rich quick', 'EASY MONEY', 'SECRET METHOD', 'MILLIONAIRE OVERNIGHT',
-          'passive income lie', 'dropshipping scam', 'crypto scam', 'NFT scam',
-          'forex scam', 'binary options', 'pump and dump', 'ponzi scheme',
-          'multi level marketing', 'MLM', 'pyramid scheme',
-          'exposed', 'drama', 'beef', 'cancelled', 'SHOCKING', 'UNBELIEVABLE',
-          'one weird trick', 'secret the rich', 'what billionaires', 'they hide'
-        ]
-      }
-    };
-
-    return allRules[persona] || allRules.polymath;
-  }
-
-  // Observer for new videos
-  let observerTimeout = null;
-  function startObserver() {
-    if (observer) observer.disconnect();
-
-    observer = new MutationObserver(() => {
-      clearTimeout(observerTimeout);
-      observerTimeout = setTimeout(() => {
-        handleYouTube();
-      }, 1000);
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    console.log('[Focus Feed] ✓ Observer started');
-  }
-
-  // MEGA TURBO MODE: Floods ALL algorithms across ALL platforms
   function activateTurboMode() {
     console.log('[Focus Feed] 🚀🚀🚀 MEGA TURBO MODE ACTIVATED');
 
@@ -747,7 +758,6 @@
     progressBar.style.width = '30%';
     progressText.textContent = 'Opening separate window...';
 
-    // Send MEGA TURBO command with current persona
     chrome.runtime.sendMessage({
       action: 'turboTrain',
       persona: selectedPersona
@@ -761,31 +771,9 @@
         progressDiv.style.display = 'none';
         progressBar.style.width = '0%';
 
-        updateDebugPanel('✓ MEGA trained: YouTube, X, Facebook, Instagram, Wikipedia, Reddit, Medium, Quora, GitHub...');
+        updateDebugPanel('✓ MEGA trained: YouTube, X, Facebook, Instagram, Wikipedia, Reddit...');
       }, 5000);
     });
-  }
-
-  function searchAndAddEducationalVideos(videos, progressBar, progressText, btn) {
-    // Educational search queries
-    const searches = [
-      'MIT OpenCourseWare',
-      'Stanford lecture',
-      'Veritasium',
-      'Kurzgesagt',
-      '3Blue1Brown',
-      'Khan Academy tutorial',
-      'TED talk science',
-      'Harvard lecture'
-    ];
-
-    const searchQuery = searches[Math.floor(Math.random() * searches.length)];
-
-    progressText.textContent = `Searching for: ${searchQuery}...`;
-    progressBar.style.width = '50%';
-
-    // Navigate to search (will trigger new scan)
-    window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
   }
 
   // Start when DOM is ready
