@@ -13,57 +13,32 @@ const personas = [
   {
     id: 'common-sense',
     name: '🎯 Common Sense',
-    description: 'Practical skills, life advice & real knowledge'
+    description: 'Practical skills, life advice & real knowledge (Default)'
   },
   {
     id: 'polymath',
-    name: 'The Polymath',
-    description: 'Renaissance thinking across disciplines'
+    name: '📚 Polymath',
+    description: 'Academic learning, STEM, humanities & universities'
   },
   {
     id: 'engineer',
-    name: 'The Engineer',
-    description: 'Technology, systems & building'
+    name: '⚙️ Engineer',
+    description: 'Programming, tech, DevOps & software development'
   },
   {
     id: 'strategist',
-    name: 'The Strategist',
-    description: 'Business, finance & planning'
+    name: '📈 Strategist',
+    description: 'Business, finance, investing & economics'
   },
   {
-    id: 'stoic',
-    name: 'The Stoic',
-    description: 'Philosophy & mental resilience'
+    id: 'health',
+    name: '💪 Health',
+    description: 'Fitness, nutrition, mental health & medical science'
   },
   {
-    id: 'scientist',
-    name: 'The Scientist',
-    description: 'Research, discovery & inquiry'
-  },
-  {
-    id: 'artist',
-    name: 'The Artist',
-    description: 'Creativity, design & expression'
-  },
-  {
-    id: 'warrior',
-    name: 'The Warrior',
-    description: 'Discipline, strength & performance'
-  },
-  {
-    id: 'healer',
-    name: 'The Healer',
-    description: 'Health, longevity & wellness'
-  },
-  {
-    id: 'explorer',
-    name: 'The Explorer',
-    description: 'Discovery, adventure & frontiers'
-  },
-  {
-    id: 'sage',
-    name: 'The Sage',
-    description: 'Wisdom, meaning & understanding'
+    id: 'creative',
+    name: '🎨 Creative',
+    description: 'Art, design, music, video, writing & photography'
   }
 ];
 
