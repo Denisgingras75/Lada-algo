@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Focus Feed - Algorithm Trainer",
-  "version": "5.2.0",
+  "version": "7.0.0",
   "description": "Train social media algorithms to show educational content using AI-powered persona classification",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "tabs"
+    "tabs",
+    "windows"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
@@ -15,7 +16,16 @@
     "*://*.instagram.com/*",
     "*://*.twitter.com/*",
     "*://*.x.com/*",
-    "*://*.tiktok.com/*"
+    "*://*.tiktok.com/*",
+    "*://*.wikipedia.org/*",
+    "*://*.reddit.com/*",
+    "*://*.medium.com/*",
+    "*://*.quora.com/*",
+    "*://*.coursera.org/*",
+    "*://*.edx.org/*",
+    "*://*.khanacademy.org/*",
+    "*://*.github.com/*",
+    "*://*.stackoverflow.com/*"
   ],
   "action": {
     "default_popup": "popup.html"
@@ -33,7 +43,7 @@
         "*://*.x.com/*",
         "*://*.tiktok.com/*"
       ],
-      "js": ["presets.js", "classifier.js", "content.js"], 
+      "js": ["content.js"], 
       "run_at": "document_end"
     }
   ]
