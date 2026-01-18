@@ -1,11 +1,12 @@
 // Background service worker for Focus Feed - TURBO MODE
-// Opens multiple tabs simultaneously to FLOOD the algorithm
+// Opens a SEPARATE WINDOW with multiple tabs to FLOOD all algorithms
 
 let videoQueue = [];
 let isProcessing = false;
 let processedVideos = new Set();
 let activeTabs = new Set();
-const MAX_PARALLEL_TABS = 10; // Open 10 tabs at once for FAST results
+let trainingWindow = null;
+const MAX_PARALLEL_TABS = 15; // Open 15 tabs at once for FAST results
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
