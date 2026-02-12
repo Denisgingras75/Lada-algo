@@ -40,18 +40,22 @@
     } else if (message.action === 'playAndLikeVideo') {
       playAndLikeVideo();
       sendResponse({ success: true });
+    } else if (message.action === 'trainAlgorithm') {
+      trainYouTubeAlgorithm(message.persona || selectedPersona);
+      sendResponse({ success: true });
     }
     return true;
   });
 
   // Function to PLAY and LIKE video (YouTube only)
-  function playAndLikeVideo() {
+  async function playAndLikeVideo() {
     if (currentPlatform !== 'youtube') return false;
 
     try {
       const playButton = document.querySelector('button.ytp-play-button');
       const video = document.querySelector('video');
 
+      // Play video
       if (video && video.paused) {
         console.log('[Focus Feed] ▶️ Playing video:', document.title);
         video.play();
@@ -59,30 +63,33 @@
         playButton.click();
       }
 
-      setTimeout(() => {
-        const likeButton = document.querySelector(
-          'like-button-view-model button[aria-label*="like"], ' +
-          'button[aria-label="Like this video"], ' +
-          '#segmented-like-button button'
-        );
+      // Random delay before liking (10-30 seconds - watch some of the video first)
+      const likeDelay = Math.floor(Math.random() * (30000 - 10000 + 1)) + 10000;
+      await randomDelay(likeDelay, likeDelay + 1000);
 
-        if (likeButton && likeButton.getAttribute('aria-pressed') !== 'true') {
-          console.log('[Focus Feed] ❤️ Liking video:', document.title);
-          likeButton.click();
-        }
-      }, 2000);
+      const likeButton = document.querySelector(
+        'like-button-view-model button[aria-label*="like"], ' +
+        'button[aria-label="Like this video"], ' +
+        '#segmented-like-button button'
+      );
 
-      setTimeout(() => {
-        const subscribeButton = document.querySelector(
-          'ytd-subscribe-button-renderer button[aria-label*="Subscribe"], ' +
-          'button.yt-spec-button-shape-next[aria-label*="Subscribe"]'
-        );
+      if (likeButton && likeButton.getAttribute('aria-pressed') !== 'true') {
+        console.log('[Focus Feed] ❤️ Liking video:', document.title);
+        likeButton.click();
+      }
 
-        if (subscribeButton && subscribeButton.textContent.toLowerCase().includes('subscribe')) {
-          console.log('[Focus Feed] 🔔 Subscribing to channel');
-          subscribeButton.click();
-        }
-      }, 4000);
+      // Random delay before subscribing (3-8 seconds after liking)
+      await randomDelay(3000, 8000);
+
+      const subscribeButton = document.querySelector(
+        'ytd-subscribe-button-renderer button[aria-label*="Subscribe"], ' +
+        'button.yt-spec-button-shape-next[aria-label*="Subscribe"]'
+      );
+
+      if (subscribeButton && subscribeButton.textContent.toLowerCase().includes('subscribe')) {
+        console.log('[Focus Feed] 🔔 Subscribing to channel');
+        subscribeButton.click();
+      }
 
       return true;
     } catch (error) {
@@ -111,6 +118,131 @@
       console.error('[Focus Feed] Error liking video:', error);
       return false;
     }
+  }
+
+  // ==================== ALGORITHM TRAINING (PUSH SIDE) ====================
+
+  // Helper: Random delay to look human
+  function randomDelay(min, max) {
+    return new Promise(resolve => {
+      const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+      setTimeout(resolve, delay);
+    });
+  }
+
+  // Helper: Random choice from array
+  function randomChoice(array) {
+    return array[Math.floor(Math.random() * array.length)];
+  }
+
+  // Get search terms for persona
+  function getPersonaSearchTerms(persona) {
+    const searchTerms = {
+      'common-sense': [
+        'how to be productive', 'time management tips', 'financial planning basics',
+        'healthy habits', 'self improvement', 'budgeting guide', 'exercise routine',
+        'mental health tips', 'career advice', 'cooking healthy meals'
+      ],
+      'polymath': [
+        'MIT lecture', 'Stanford course', 'Veritasium', 'Kurzgesagt',
+        '3Blue1Brown', 'physics explained', 'mathematics tutorial',
+        'history documentary', 'philosophy lecture', 'science explained'
+      ],
+      'engineer': [
+        'Python tutorial', 'React tutorial', 'system design', 'algorithms explained',
+        'Docker tutorial', 'AWS tutorial', 'clean code', 'data structures',
+        'JavaScript advanced', 'software engineering'
+      ],
+      'strategist': [
+        'business strategy', 'Warren Buffett', 'Y Combinator', 'startup advice',
+        'investing basics', 'financial analysis', 'economics explained',
+        'market analysis', 'business model', 'entrepreneurship'
+      ],
+      'health': [
+        'Andrew Huberman', 'strength training', 'nutrition science',
+        'sleep hygiene', 'mental health', 'fitness tutorial',
+        'healthy eating', 'workout routine', 'medical research'
+      ],
+      'creative': [
+        'art tutorial', 'music theory', 'video editing', 'photography tips',
+        'design principles', 'drawing tutorial', 'film making',
+        'creative writing', 'color theory', 'composition'
+      ]
+    };
+
+    return searchTerms[persona] || searchTerms['common-sense'];
+  }
+
+  // NEW: Train algorithm by engaging with educational content
+  async function trainYouTubeAlgorithm(persona) {
+    if (currentPlatform !== 'youtube') {
+      console.log('[Focus Feed] Algorithm training only works on YouTube');
+      return;
+    }
+
+    console.log('[Focus Feed] 🎓 Starting algorithm training session...');
+    updateDebugPanel('🎓 Training algorithm...');
+
+    try {
+      // Set session flag to track this is a training session
+      sessionStorage.setItem('ff_training_session', 'true');
+      sessionStorage.setItem('ff_training_persona', persona);
+
+      // Step 1: Get search term
+      const searchTerms = getPersonaSearchTerms(persona);
+      const searchTerm = randomChoice(searchTerms);
+      console.log('[Focus Feed] Searching for:', searchTerm);
+
+      // Step 2: Navigate to search (will trigger engageWithSearchResults on next page)
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerm)}`;
+
+      // Small delay to make it look less bot-like
+      await randomDelay(1000, 2000);
+      window.location.href = searchUrl;
+
+    } catch (error) {
+      console.error('[Focus Feed] Error in algorithm training:', error);
+      updateDebugPanel('❌ Training error');
+      sessionStorage.removeItem('ff_training_session');
+    }
+  }
+
+  // Engage with search results (called when on search results page)
+  async function engageWithSearchResults() {
+    if (!window.location.href.includes('/results?search_query=')) return;
+
+    const isTrainingSession = sessionStorage.getItem('ff_training_session');
+    if (isTrainingSession !== 'true') return;
+
+    console.log('[Focus Feed] On search results page, finding educational video...');
+    updateDebugPanel('🔍 Finding educational video...');
+
+    // Wait for page to fully load
+    await randomDelay(2000, 4000);
+
+    // Find video thumbnails
+    const videos = document.querySelectorAll('ytd-video-renderer a#video-title');
+
+    if (videos.length === 0) {
+      console.log('[Focus Feed] No videos found on search results');
+      updateDebugPanel('❌ No videos found');
+      sessionStorage.removeItem('ff_training_session');
+      return;
+    }
+
+    // Click on a video (randomize position 0-4 to look natural)
+    const videoIndex = Math.floor(Math.random() * Math.min(5, videos.length));
+    const targetVideo = videos[videoIndex];
+    const videoTitle = targetVideo.textContent.trim();
+
+    console.log('[Focus Feed] Clicking video:', videoTitle);
+    updateDebugPanel(`📺 Opening: ${videoTitle.substring(0, 30)}...`);
+
+    // Delay before clicking (look human)
+    await randomDelay(1000, 3000);
+    targetVideo.click();
+
+    // Engagement will continue on the video page (handled in init when video loads)
   }
 
   // Initialize
@@ -159,6 +291,30 @@
     }
 
     console.log(`[Focus Feed] 🎯 Active - ${filterMode.toUpperCase()} mode on ${currentPlatform}`);
+
+    // Check if we're on a search results page (part of training session)
+    if (currentPlatform === 'youtube' && window.location.href.includes('/results?search_query=')) {
+      setTimeout(() => {
+        engageWithSearchResults();
+      }, 3000);
+    }
+
+    // Check if we're on a video page and should engage
+    if (currentPlatform === 'youtube' && window.location.href.includes('/watch?v=')) {
+      // Check if this is from a training session (check sessionStorage flag)
+      const isTrainingSession = sessionStorage.getItem('ff_training_session');
+      if (isTrainingSession === 'true') {
+        console.log('[Focus Feed] Training session video detected, will engage...');
+        setTimeout(() => {
+          playAndLikeVideo();
+          updateDebugPanel('✅ Engaged with educational content');
+          // Clear flag after 30 seconds
+          setTimeout(() => {
+            sessionStorage.removeItem('ff_training_session');
+          }, 30000);
+        }, 5000);
+      }
+    }
 
     startScanning();
   }
@@ -1066,6 +1222,20 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       ">${filterMode === 'smart' ? '🧠 SMART MODE (ON)' : '💥 MEGA MODE (ON)'}</button>
       <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">${filterMode === 'smart' ? 'Removes junk, keeps your interests' : 'Nuclear option - floods everything'}</div>
+      <button id="ff-train-btn" style="
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 13px;
+        box-shadow: 0 2px 8px rgba(6,182,212,0.4);
+      ">🎓 TRAIN ALGORITHM NOW</button>
+      <div style="font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 3px; text-align: center;">Search → Watch → Like → Subscribe</div>
       <button id="ff-turbo-btn" style="
         width: 100%;
         padding: 10px;
@@ -1093,6 +1263,7 @@
     console.log('[Focus Feed] ✓ Debug panel created');
 
     document.getElementById('ff-mode-toggle').addEventListener('click', toggleFilterMode);
+    document.getElementById('ff-train-btn').addEventListener('click', startTrainingSession);
     document.getElementById('ff-turbo-btn').addEventListener('click', activateTurboMode);
   }
 
@@ -1138,6 +1309,34 @@
       const lastActionEl = document.getElementById('ff-last-action');
       if (lastActionEl) lastActionEl.textContent = action;
     }
+  }
+
+  function startTrainingSession() {
+    if (currentPlatform !== 'youtube') {
+      alert('Algorithm training only works on YouTube!\nPlease navigate to youtube.com and try again.');
+      return;
+    }
+
+    console.log('[Focus Feed] 🎓 Starting training session...');
+
+    const btn = document.getElementById('ff-train-btn');
+    const progressDiv = document.getElementById('ff-progress');
+    const progressBar = document.getElementById('ff-progress-bar');
+    const progressText = document.getElementById('ff-progress-text');
+
+    btn.disabled = true;
+    btn.textContent = '🎓 TRAINING...';
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '20%';
+    progressText.textContent = 'Searching for educational content...';
+
+    updateDebugPanel(`🎓 Training algorithm with ${selectedPersona} persona...`);
+
+    // Trigger the training algorithm
+    trainYouTubeAlgorithm(selectedPersona);
+
+    // The button will re-enable when the new page loads
+    // (Training involves page navigation, so this button will be recreated)
   }
 
   function activateTurboMode() {
