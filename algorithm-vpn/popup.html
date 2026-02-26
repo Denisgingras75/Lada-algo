@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=340">
+  <title>Algorithm VPN</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-title">
+        <span class="logo">VPN</span>
+        <h1>Algorithm VPN</h1>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="enabled-toggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- Status -->
+    <div class="status" id="status">
+      <span class="status-dot active"></span>
+      <span id="status-text">Connected — Calm mode</span>
+    </div>
+
+    <!-- Persona Selector -->
+    <div class="personas" id="persona-list">
+      <!-- Populated by popup.js -->
+    </div>
+
+    <!-- Focus Keywords (shown only when Focus persona is selected) -->
+    <div class="focus-config" id="focus-config" style="display: none;">
+      <label for="focus-keywords">Your topics (comma-separated):</label>
+      <input type="text" id="focus-keywords" placeholder="e.g. climate, economics, rust programming">
+      <button id="save-keywords" class="btn-small">Save</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="platform-badge" id="platform-badge">—</span>
+      <span class="version">v1.0.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

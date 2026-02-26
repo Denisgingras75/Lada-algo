@@ -1,0 +1,277 @@
+/* Algorithm VPN — Popup Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  color: #e4e4e7;
+  background: #18181b;
+}
+
+.container {
+  padding: 16px;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fafafa;
+}
+
+/* ── Toggle ──────────────────────────────────────────────────── */
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #3f3f46;
+  border-radius: 22px;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: #fafafa;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: #6366f1;
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* ── Status ──────────────────────────────────────────────────── */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #27272a;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #71717a;
+  flex-shrink: 0;
+}
+
+.status-dot.active {
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e88;
+}
+
+.status-dot.inactive {
+  background: #71717a;
+}
+
+/* ── Persona List ────────────────────────────────────────────── */
+
+.personas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.persona-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #27272a;
+  color: #e4e4e7;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.persona-btn:hover {
+  background: #3f3f46;
+  border-color: #52525b;
+}
+
+.persona-btn.selected {
+  background: #1e1b4b;
+  border-color: #6366f1;
+}
+
+.persona-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.persona-icon.raw { background: #27272a; color: #a1a1aa; }
+.persona-icon.calm { background: #172554; color: #60a5fa; }
+.persona-icon.learn { background: #14532d; color: #4ade80; }
+.persona-icon.discovery { background: #431407; color: #fb923c; }
+.persona-icon.focus { background: #4a044e; color: #e879f9; }
+
+.persona-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.persona-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fafafa;
+}
+
+.persona-desc {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 1px;
+}
+
+/* ── Focus Config ────────────────────────────────────────────── */
+
+.focus-config {
+  padding: 10px 12px;
+  background: #27272a;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.focus-config label {
+  display: block;
+  font-size: 11px;
+  color: #a1a1aa;
+  margin-bottom: 6px;
+}
+
+.focus-config input {
+  width: 100%;
+  padding: 7px 10px;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 5px;
+  color: #fafafa;
+  font-size: 12px;
+  outline: none;
+  margin-bottom: 6px;
+}
+
+.focus-config input:focus {
+  border-color: #6366f1;
+}
+
+.btn-small {
+  padding: 5px 12px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background: #4f46e5;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #27272a;
+}
+
+.platform-badge {
+  font-size: 11px;
+  color: #71717a;
+  background: #27272a;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.version {
+  font-size: 11px;
+  color: #52525b;
+}
+
+/* ── Disabled State ──────────────────────────────────────────── */
+
+body.disabled .personas,
+body.disabled .focus-config {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+body.disabled .status-dot {
+  background: #71717a;
+  box-shadow: none;
+}

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Algorithm VPN",
+  "version": "1.0.0",
+  "description": "Switch your feed's algorithm like switching a VPN. Same content, different order.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.twitter.com/*",
+    "*://*.x.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Algorithm VPN"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*"
+      ],
+      "js": [
+        "scoring/engine.js",
+        "platforms/youtube.js",
+        "platforms/twitter.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
