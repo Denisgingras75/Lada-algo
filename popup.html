@@ -1,115 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Focus Feed</title>
-  <style>
-    /* ... (Keep your existing styles) ... */
-    
-    /* NEW STYLES FOR TURBO BUTTON */
-    .turbo-section {
-      margin-top: 16px;
-      padding: 16px;
-      background: linear-gradient(45deg, #1a1a1a, #2a1a1a);
-      border: 1px solid #ff444430;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .turbo-btn {
-      width: 100%;
-      padding: 12px;
-      background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 14px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4);
-      transition: transform 0.2s;
-    }
-    .turbo-btn:hover {
-      transform: scale(1.02);
-      box-shadow: 0 6px 20px rgba(255, 65, 108, 0.6);
-    }
-    .turbo-desc {
-      font-size: 11px;
-      color: #aaa;
-      margin-top: 8px;
-    }
-    /* ... (Keep existing styles) ... */
-  </style>
-  
-  <link rel="stylesheet" href="styles.css"> <style>
-      /* Ensure the body styling matches previous file */
-      body { width: 360px; padding: 20px; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, sans-serif; }
-      /* ... paste the rest of the original CSS here if not using external file ... */
-      /* For brevity, I'm assuming you kept the original CSS block from previous steps */
-      .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
-      .stat-card { background: #1a1a1a; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #333; }
-      .stat-value { font-size: 20px; font-weight: bold; color: #667eea; }
-      .stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
-      .toggle-container { display: flex; justify-content: space-between; margin-bottom: 20px; background: #222; padding: 10px; border-radius: 8px; align-items: center;}
-      .persona-grid { display: grid; gap: 8px; }
-      .persona-option { padding: 10px; background: #222; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
-      .persona-option.active { border-color: #667eea; background: #1a1a2a; }
-      .persona-name { font-weight: bold; font-size: 14px; }
-      .persona-desc { font-size: 11px; color: #888; }
-      .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
-      .action-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; background: #333; color: white; }
-  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="ui/popup.css">
 </head>
 <body>
-  <h1>Focus Feed <span style="font-size:12px; opacity:0.5; font-weight:normal;">v5.2</span></h1>
-
-  <div class="toggle-container">
-    <span class="toggle-label">Focus Mode</span>
-    <input type="checkbox" id="toggleFocus" checked>
+  <div class="head">
+    <span class="dot" id="dot"></span>
+    <span class="brand">drift<small>steer your feed</small></span>
+    <label class="switch" title="drift active">
+      <input type="checkbox" id="enabled">
+      <span class="track"></span>
+    </label>
   </div>
 
-  <div class="stats-section">
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="likedCount">0</div>
-        <div class="stat-label">Liked</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="hiddenCount">0</div>
-        <div class="stat-label">Hidden</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="dailyCount">0</div>
-        <div class="stat-label">Session</div>
-      </div>
+  <div class="sec">
+    <div class="lab">Direction</div>
+    <div class="dirs" id="dirs"></div>
+    <div class="fields" id="customFields">
+      <div class="field more"><label>more of these terms</label>
+        <input id="moreTerms" placeholder="guitar, timber framing, macro" autocomplete="off"></div>
+      <div class="field less"><label>less of these terms</label>
+        <input id="lessTerms" placeholder="crypto pump, celebrity drama" autocomplete="off"></div>
     </div>
   </div>
-  
-  <div class="turbo-section">
-    <button id="turboBtn" class="turbo-btn">⚡ Run Turbo Train</button>
-    <div class="turbo-desc">Opens background tabs to flood algorithm with high-quality signals.</div>
+
+  <div class="sec">
+    <div class="lab">Intensity</div>
+    <div class="rowflex">
+      <input type="range" id="intensity" min="10" max="100" step="5">
+      <span class="intval" id="intval">60</span>
+    </div>
   </div>
 
-  <div style="margin-top: 20px;">
-    <h2 style="font-size:14px; color:#aaa; margin-bottom:10px;">Persona</h2>
-    <div class="persona-grid" id="personaGrid"></div>
+  <div class="sec sig">
+    <label class="switch" title="send real signals">
+      <input type="checkbox" id="sendSignals"><span class="track"></span>
+    </label>
+    <div class="copy"><b>Send real "not interested" signals.</b> Off by default.
+      When on, drift clicks the platform's own feedback on hidden items — the same
+      action you'd take by hand. Slower and more permanent than just reshaping the view.</div>
   </div>
 
-  <div style="margin-top: 20px;">
-    <span style="font-size:12px; color:#aaa;">Intensity: <span id="intensityValue">80%</span></span>
-    <input type="range" id="intensitySlider" min="0" max="100" value="80" style="width:100%">
+  <div class="sec insp">
+    <div class="lab">Inspect a headline</div>
+    <input id="inspInput" placeholder="paste a video title to see what drift would do" autocomplete="off">
+    <div class="out" id="inspOut">
+      <span class="pill" id="inspPill">KEEP</span>
+      <div class="metric"><span>manufactured-arousal</span><b id="inspArous">0.00</b></div>
+      <div class="metric"><span>familiarity to your feed</span><b id="inspFam">0.00</b></div>
+      <div class="metric" id="inspExtraRow" style="display:none"><span id="inspExtraLab"></span><b id="inspExtra">0.00</b></div>
+      <div class="toks" id="inspToks"></div>
+    </div>
   </div>
 
-  <div class="action-buttons">
-    <button id="settingsBtn" class="action-btn">Settings</button>
-    <button id="exportBtn" class="action-btn">Export</button>
-  </div>
-  
-  <div id="status" style="margin-top:15px; font-size:11px; color:#666; text-align:center;">Ready</div>
+  <div class="foot">Local only — your feed-model never leaves this browser. drift reshapes what
+    you see and (optionally) sends native feedback; it does not access platform servers directly.</div>
 
-  <script src="classifier.js"></script>
+  <script src="src/lexicons.js"></script>
+  <script src="src/profile.js"></script>
+  <script src="src/directions.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -1,50 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "Focus Feed - Algorithm Trainer",
-  "version": "7.0.0",
-  "description": "Train social media algorithms to show educational content using AI-powered persona classification",
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "tabs",
-    "windows"
-  ],
+  "name": "drift — a steering layer for your feed",
+  "version": "1.0.0",
+  "description": "Point your recommendation feed in a direction you choose: Novelty, Rabbit hole, Detox, Touch grass, or your own terms. Local, honest, no flooding.",
+  "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "*://*.youtube.com/*",
-    "*://*.facebook.com/*",
-    "*://*.instagram.com/*",
     "*://*.twitter.com/*",
-    "*://*.x.com/*",
-    "*://*.tiktok.com/*",
-    "*://*.wikipedia.org/*",
-    "*://*.reddit.com/*",
-    "*://*.medium.com/*",
-    "*://*.quora.com/*",
-    "*://*.coursera.org/*",
-    "*://*.edx.org/*",
-    "*://*.khanacademy.org/*",
-    "*://*.github.com/*",
-    "*://*.stackoverflow.com/*"
+    "*://*.x.com/*"
   ],
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
+  "action": { "default_popup": "popup.html", "default_title": "drift" },
   "content_scripts": [
     {
       "matches": [
         "*://*.youtube.com/*",
-        "*://*.facebook.com/*",
-        "*://*.instagram.com/*",
         "*://*.twitter.com/*",
-        "*://*.x.com/*",
-        "*://*.tiktok.com/*"
+        "*://*.x.com/*"
       ],
-      "js": ["content.js"], 
-      "run_at": "document_end"
+      "js": [
+        "src/lexicons.js",
+        "src/profile.js",
+        "src/directions.js",
+        "src/adapters.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
     }
   ]
 }
