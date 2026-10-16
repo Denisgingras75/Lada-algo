@@ -1,0 +1,303 @@
+<title>Focus Feed Mobile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0e1411">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one thumb-width column — persona chips, a big "next signal" card, then reset tips. */
+:root {
+  --bg: #f3f5f2; --surface: #ffffff; --fg: #16201b; --muted: #5d6b63;
+  --line: #d9e0db; --accent: #1f7a55; --accent-ink: #ffffff; --done: #e3efe8;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1411; --surface: #17201b; --fg: #e6eee9; --muted: #91a198;
+  --line: #26322b; --accent: #4fd39a; --accent-ink: #08130d; --done: #1b2a22; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1411; --surface: #17201b; --fg: #e6eee9; --muted: #91a198;
+  --line: #26322b; --accent: #4fd39a; --accent-ink: #08130d; --done: #1b2a22; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); -webkit-tap-highlight-color: transparent; }
+.wrap { max-width: 520px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+h1 { font: 800 2rem/1.05 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font: 600 1.15rem/1.2 var(--display); margin: 0 0 10px; }
+.lede { color: var(--muted); margin: 6px 0 0; }
+.label { font: 500 0.7rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; margin: 0 -16px; padding-inline: 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  font: 500 0.92rem var(--body); padding: 10px 14px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.persona-desc { color: var(--muted); font-size: 0.9rem; margin: 8px 0 0; min-height: 1.5em; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 20px; display: grid; gap: 14px; }
+.progress-row { display: flex; justify-content: space-between; align-items: baseline; }
+.count { font: 500 0.85rem var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+.target-platform { font: 500 0.75rem var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.target-name { font: 800 1.6rem/1.15 var(--display); letter-spacing: -0.01em; overflow-wrap: anywhere; margin-top: 2px; }
+.target-hint { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+.go { display: block; text-align: center; text-decoration: none; background: var(--accent); color: var(--accent-ink);
+  font: 600 1.1rem var(--body); padding: 18px; border-radius: 14px; }
+.row { display: flex; gap: 10px; }
+.ghost { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--fg); font: 500 0.95rem var(--body);
+  padding: 12px; border-radius: 12px; cursor: pointer; }
+.finished { text-align: center; padding: 8px 0; }
+.finished b { font: 800 1.4rem var(--display); display: block; }
+
+.queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.queue li { display: flex; gap: 10px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--line); font-size: 0.92rem; min-width: 0; }
+.queue li a { color: var(--fg); text-decoration: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue li .p { font: 500 0.68rem var(--mono); text-transform: uppercase; color: var(--muted); width: 4.5em; flex: none; }
+.queue li.is-done a { color: var(--muted); text-decoration: line-through; }
+.queue li.is-current { background: var(--done); border-radius: 8px; }
+
+details { border-top: 1px solid var(--line); padding: 14px 0; }
+details:last-of-type { border-bottom: 1px solid var(--line); }
+summary { font: 600 1rem var(--body); cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+summary::after { content: "+"; color: var(--muted); font-family: var(--mono); }
+details[open] summary::after { content: "–"; }
+details ol { margin: 10px 0 0; padding-left: 1.2em; color: var(--fg); display: grid; gap: 6px; font-size: 0.95rem; }
+details a { color: var(--accent); }
+.note { color: var(--muted); font-size: 0.85rem; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="label">Focus Feed · phone edition</div>
+    <h1>Retrain your feeds from your phone</h1>
+    <p class="lede">Pick a persona, then tap through the queue. Each link opens in the YouTube, Instagram, X or Reddit app where you're logged in, so the signal lands on your real account.</p>
+  </header>
+
+  <section>
+    <div class="label" style="margin-bottom:10px">Persona</div>
+    <div class="chips" id="chips" role="group" aria-label="Persona"></div>
+    <p class="persona-desc" id="personaDesc"></p>
+  </section>
+
+  <section class="card" aria-live="polite">
+    <div class="progress-row"><span class="label">Training queue</span><span class="count" id="count">0 / 0</span></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div id="current">
+      <div class="target-platform" id="tPlatform"></div>
+      <div class="target-name" id="tName"></div>
+      <div class="target-hint" id="tHint"></div>
+    </div>
+    <a class="go" id="go" href="#" target="_blank" rel="noopener">Open</a>
+    <div class="row">
+      <button class="ghost" id="skip" type="button">Skip</button>
+      <button class="ghost" id="shuffle" type="button">New queue</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Up next</h2>
+    <ul class="queue" id="queue"></ul>
+  </section>
+
+  <section>
+    <h2>Clear out the junk</h2>
+    <p class="note" style="margin:0 0 6px">Opening good stuff helps. Telling each app what you don't want helps faster. Takes about two minutes per app.</p>
+    <details><summary>YouTube</summary><ol>
+      <li>On any junk video, tap <b>⋮</b> → <b>Not interested</b>, or <b>Don't recommend channel</b>.</li>
+      <li>You → Settings → <b>Manage all history</b> → delete the stretch you want gone.</li>
+      <li>While training, like or save at least one video per search. Watching 30+ seconds counts more than a tap.</li>
+    </ol></details>
+    <details><summary>Instagram</summary><ol>
+      <li>Settings → <b>Content preferences</b> → <b>Reset suggested content</b>.</li>
+      <li>On Explore or Reels, tap <b>⋯</b> → <b>Not interested</b>.</li>
+      <li>Follow two or three accounts from the queue. Follows outweigh visits.</li>
+    </ol></details>
+    <details><summary>TikTok</summary><ol>
+      <li>Settings → <b>Content preferences</b> → <b>Refresh your For You feed</b>.</li>
+      <li>Long-press any junk video → <b>Not interested</b>.</li>
+      <li>Same page: <b>Filter video keywords</b> to block topics outright.</li>
+    </ol></details>
+    <details><summary>X</summary><ol>
+      <li>On a bad post, tap <b>⋯</b> → <b>Not interested in this post</b>.</li>
+      <li>Settings → Privacy and safety → Content you see → <b>Interests</b>; untick what you don't want.</li>
+      <li>Mute words you're sick of under <b>Mute and block</b> → Muted words.</li>
+    </ol></details>
+    <details><summary>Facebook</summary><ol>
+      <li>On a post, tap <b>⋯</b> → <b>Show less</b> or <b>Hide post</b>.</li>
+      <li>Menu → Settings → <b>Feeds</b> to snooze or unfollow pages.</li>
+    </ol></details>
+    <details><summary>Ads everywhere</summary><ol>
+      <li>Google: <a href="https://myadcenter.google.com/" target="_blank" rel="noopener">My Ad Center</a> → turn off topics you don't want.</li>
+      <li>Meta (Facebook + Instagram): <a href="https://accountscenter.facebook.com/ad_preferences" target="_blank" rel="noopener">Ad preferences</a> → Ad topics → See less.</li>
+    </ol></details>
+  </section>
+
+  <p class="note">Your progress stays on this phone only. Nothing is sent anywhere.</p>
+</div>
+
+<script>
+(function () {
+  const PERSONAS = {
+    'common-sense': { name: 'Common Sense', desc: 'Practical skills, life advice and real knowledge',
+      yt: ['how to fix things around the house', 'personal finance basics', 'cooking fundamentals', 'car maintenance for beginners', 'first aid basics', 'negotiation skills'],
+      reddit: ['LifeProTips', 'personalfinance', 'explainlikeimfive', 'HomeImprovement', 'Cooking'],
+      wiki: ['Critical_thinking', 'Compound_interest', 'Cognitive_bias', 'Nutrition'],
+      ig: ['natgeo', 'nasa', 'ted'], x: ['naval', 'NatGeo', 'Reuters'] },
+    polymath: { name: 'Polymath', desc: 'Renaissance thinking across disciplines',
+      yt: ['Kurzgesagt', 'Veritasium', 'CGP Grey', 'Tom Scott', 'CrashCourse history', 'Vsauce'],
+      reddit: ['AskHistorians', 'DepthHub', 'TrueReddit', 'askscience', 'philosophy'],
+      wiki: ['Leonardo_da_Vinci', 'Renaissance', 'Scientific_Revolution', 'Age_of_Enlightenment'],
+      ig: ['smithsonian', 'natgeo', 'ted'], x: ['waitbutwhy', 'sapinker', 'TheEconomist'] },
+    engineer: { name: 'Engineer', desc: 'Technology, systems and building',
+      yt: ['Real Engineering', 'Practical Engineering', 'Mark Rober', 'Stuff Made Here', 'Ben Eater', 'Applied Science'],
+      reddit: ['engineering', 'AskEngineers', 'learnprogramming', 'electronics', 'programming'],
+      wiki: ['Control_theory', 'Semiconductor', 'Algorithm', 'Thermodynamics'],
+      ig: ['nasa', 'spacex', 'mit'], x: ['paulg', 'karpathy', 'NASA'] },
+    strategist: { name: 'Strategist', desc: 'Business, finance and planning',
+      yt: ['Patrick Boyle', 'Ben Felix', 'Y Combinator startup school', 'Acquired podcast', 'How the Economic Machine Works'],
+      reddit: ['Economics', 'investing', 'Entrepreneur', 'smallbusiness', 'business'],
+      wiki: ['Game_theory', 'Behavioral_economics', 'Opportunity_cost', 'Index_fund'],
+      ig: ['theeconomist', 'wsj', 'ft'], x: ['TheEconomist', 'FT', 'stratechery'] },
+    stoic: { name: 'Stoic', desc: 'Philosophy and mental resilience',
+      yt: ['Daily Stoic', 'Marcus Aurelius Meditations', 'Seneca letters', 'Philosophy Tube', 'School of Life'],
+      reddit: ['Stoicism', 'philosophy', 'getdisciplined', 'Meditation'],
+      wiki: ['Stoicism', 'Marcus_Aurelius', 'Epictetus', 'Seneca_the_Younger'],
+      ig: ['dailystoic', 'theschooloflifetv'], x: ['dailystoic', 'naval'] },
+    scientist: { name: 'Scientist', desc: 'Research, discovery and inquiry',
+      yt: ['PBS Space Time', '3Blue1Brown', 'SciShow', 'MinutePhysics', 'Numberphile', 'Sabine Hossenfelder'],
+      reddit: ['science', 'askscience', 'Physics', 'space', 'biology'],
+      wiki: ['Quantum_mechanics', 'Evolution', 'DNA', 'General_relativity'],
+      ig: ['nasa', 'sciencenews', 'scientificamerican'], x: ['NASA', 'neiltyson', 'ScienceNews'] },
+    artist: { name: 'Artist', desc: 'Creativity, design and expression',
+      yt: ['Proko drawing', 'The Art Assignment', 'Vox Earworm', 'Every Frame a Painting', 'Pottery wheel tutorial'],
+      reddit: ['ArtFundamentals', 'design', 'learnart', 'Filmmakers', 'photography'],
+      wiki: ['Color_theory', 'Bauhaus', 'Impressionism', 'Typography'],
+      ig: ['moma', 'metmuseum', 'tate'], x: ['MuseumModernArt', 'metmuseum'] },
+    warrior: { name: 'Warrior', desc: 'Discipline, strength and performance',
+      yt: ['Jeff Nippard', 'Athlean-X', 'mobility routine', 'Huberman Lab exercise', 'running form'],
+      reddit: ['Fitness', 'bodyweightfitness', 'getdisciplined', 'running', 'xxfitness'],
+      wiki: ['Progressive_overload', 'Strength_training', 'Habit', 'VO2_max'],
+      ig: ['jeffnippard', 'natgeo'], x: ['hubermanlab', 'PeterAttiaMD'] },
+    healer: { name: 'Healer', desc: 'Health, longevity and wellness',
+      yt: ['Huberman Lab sleep', 'Peter Attia longevity', 'Rhonda Patrick', 'Nutrition Made Simple', 'Doctor Mike'],
+      reddit: ['nutrition', 'sleep', 'Health', 'longevity', 'Meditation'],
+      wiki: ['Circadian_rhythm', 'Mediterranean_diet', 'Gut_microbiota', 'Longevity'],
+      ig: ['hubermanlab', 'drmikevarshavski'], x: ['hubermanlab', 'PeterAttiaMD', 'foundmyfitness'] },
+    explorer: { name: 'Explorer', desc: 'Discovery, adventure and frontiers',
+      yt: ['Kraig Adams hiking', 'NatGeo documentary', 'Andrew Ted', 'Lost in the Pond', 'ocean exploration'],
+      reddit: ['travel', 'CampingandHiking', 'EarthPorn', 'MapPorn', 'space'],
+      wiki: ['Age_of_Discovery', 'Mount_Everest', 'Deep_sea', 'Antarctica'],
+      ig: ['natgeo', 'natgeotravel', 'nasa'], x: ['NatGeo', 'NASA', 'NOAA'] },
+    sage: { name: 'Sage', desc: 'Wisdom, meaning and understanding',
+      yt: ['Alan Watts lecture', 'Jordan Hall', 'Lex Fridman philosophy', 'School of Life', 'Carl Jung explained'],
+      reddit: ['philosophy', 'Buddhism', 'Meditation', 'Jung', 'TrueAskReddit'],
+      wiki: ['Carl_Jung', 'Zen', 'Existentialism', 'Tao_Te_Ching'],
+      ig: ['theschooloflifetv', 'brainpicker'], x: ['naval', 'brainpicker'] }
+  };
+
+  const PLATFORM_HINT = {
+    YouTube: 'Watch one result for 30+ seconds and like it.',
+    Reddit: 'Join the sub and upvote a couple of top posts.',
+    Instagram: 'Follow, or like two or three posts.',
+    X: 'Follow, or like a recent post.',
+    Wikipedia: 'Read for a minute. Feeds Google search signals.'
+  };
+
+  function buildQueue(id) {
+    const p = PERSONAS[id], q = [];
+    p.yt.forEach(s => q.push({ platform: 'YouTube', name: s, url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(s) }));
+    p.reddit.forEach(s => q.push({ platform: 'Reddit', name: 'r/' + s, url: 'https://www.reddit.com/r/' + s + '/top/?t=month' }));
+    p.ig.forEach(s => q.push({ platform: 'Instagram', name: '@' + s, url: 'https://www.instagram.com/' + s + '/' }));
+    p.x.forEach(s => q.push({ platform: 'X', name: '@' + s, url: 'https://x.com/' + s }));
+    p.wiki.forEach(s => q.push({ platform: 'Wikipedia', name: s.replace(/_/g, ' '), url: 'https://en.m.wikipedia.org/wiki/' + s }));
+    for (let i = q.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [q[i], q[j]] = [q[j], q[i]]; }
+    return q;
+  }
+
+  const load = () => { try { return JSON.parse(localStorage.getItem('ff-mobile')) || null; } catch (e) { return null; } };
+  const save = () => { try { localStorage.setItem('ff-mobile', JSON.stringify(state)); } catch (e) {} };
+
+  let state = load();
+  if (!state || !PERSONAS[state.persona] || !Array.isArray(state.queue)) {
+    state = { persona: 'common-sense', queue: buildQueue('common-sense'), pos: 0, done: [] };
+  }
+
+  const $ = id => document.getElementById(id);
+
+  function renderChips() {
+    const chips = $('chips'); chips.innerHTML = '';
+    Object.entries(PERSONAS).forEach(([id, p]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = p.name;
+      b.setAttribute('aria-pressed', String(id === state.persona));
+      b.addEventListener('click', () => {
+        state = { persona: id, queue: buildQueue(id), pos: 0, done: [] };
+        save(); render();
+      });
+      chips.appendChild(b);
+    });
+    $('personaDesc').textContent = PERSONAS[state.persona].desc;
+  }
+
+  function render() {
+    renderChips();
+    const total = state.queue.length, n = state.done.length;
+    $('count').textContent = n + ' / ' + total;
+    $('bar').style.width = (total ? (n / total) * 100 : 0) + '%';
+
+    const cur = state.queue[state.pos];
+    if (cur) {
+      $('tPlatform').textContent = cur.platform;
+      $('tName').textContent = cur.name;
+      $('tHint').textContent = PLATFORM_HINT[cur.platform];
+      $('go').href = cur.url; $('go').hidden = false; $('skip').hidden = false;
+      $('go').textContent = 'Open in ' + cur.platform;
+    } else {
+      $('tPlatform').textContent = 'Queue done';
+      $('tName').textContent = n + ' signals sent';
+      $('tHint').textContent = 'Give it a day, then check your feeds. Run a new queue every few days for the first week.';
+      $('go').hidden = true; $('skip').hidden = true;
+    }
+
+    const ul = $('queue'); ul.innerHTML = '';
+    state.queue.forEach((item, i) => {
+      const li = document.createElement('li');
+      if (state.done.includes(i)) li.classList.add('is-done');
+      if (i === state.pos) li.classList.add('is-current');
+      const p = document.createElement('span'); p.className = 'p'; p.textContent = item.platform;
+      const a = document.createElement('a'); a.href = item.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = item.name;
+      a.addEventListener('click', () => markDone(i));
+      li.append(p, a); ul.appendChild(li);
+    });
+  }
+
+  function markDone(i) {
+    if (!state.done.includes(i)) state.done.push(i);
+    let next = state.queue.findIndex((_, k) => !state.done.includes(k));
+    state.pos = next === -1 ? state.queue.length : next;
+    save();
+    setTimeout(render, 300);
+  }
+
+  $('go').addEventListener('click', () => markDone(state.pos));
+  $('skip').addEventListener('click', () => {
+    let k = state.pos + 1;
+    while (k < state.queue.length && state.done.includes(k)) k++;
+    if (k >= state.queue.length) k = state.queue.findIndex((_, j) => !state.done.includes(j) && j !== state.pos);
+    if (k !== -1 && k !== undefined) state.pos = k;
+    save(); render();
+  });
+  $('shuffle').addEventListener('click', () => {
+    state = { persona: state.persona, queue: buildQueue(state.persona), pos: 0, done: [] };
+    save(); render();
+  });
+
+  render();
+})();
+</script>
