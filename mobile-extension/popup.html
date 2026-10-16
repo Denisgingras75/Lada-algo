@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Feed Mobile</title>
+<style>
+  :root { --bg: #0e1411; --surface: #17201b; --fg: #e6eee9; --muted: #91a198; --line: #26322b; --accent: #4fd39a; --ink: #08130d; --stop: #f08a7a; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, -apple-system, sans-serif; min-width: 300px; }
+  main { padding: 20px 16px 28px; display: grid; gap: 20px; max-width: 480px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.01em; }
+  .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  select { width: 100%; padding: 14px; font-size: 1rem; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; }
+  .desc { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 10px; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .now { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  button.big { width: 100%; padding: 18px; font-size: 1.1rem; font-weight: 700; border: 0; border-radius: 14px; background: var(--accent); color: var(--ink); }
+  button.big.stop { background: var(--stop); }
+  .toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .toggle span small { display: block; color: var(--muted); font-size: 0.82rem; }
+  input[type=checkbox] { width: 24px; height: 24px; accent-color: var(--accent); flex: none; }
+  .note { color: var(--muted); font-size: 0.82rem; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <div class="label">Focus Feed Mobile</div>
+    <h1>Auto-train your feeds</h1>
+  </div>
+
+  <div>
+    <label class="label" for="persona">Persona</label>
+    <select id="persona"></select>
+    <div class="desc" id="desc"></div>
+  </div>
+
+  <div class="card">
+    <div class="label" id="state">Idle</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="now" id="now">Tap start, then put your phone down. Takes about 10 minutes.</div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <button class="big" id="startStop" type="button">Start training</button>
+
+  <div>
+    <label class="toggle"><span>Run by itself every day<small>Starts once a day whenever Firefox is open</small></span><input type="checkbox" id="autoDaily"></label>
+    <label class="toggle"><span>Like the videos it watches<small>Strongest YouTube signal after watch time</small></span><input type="checkbox" id="autoLike"></label>
+    <label class="toggle"><span>Show training tabs<small>More reliable playback, but takes over the screen</small></span><input type="checkbox" id="showTabs"></label>
+  </div>
+
+  <p class="note">Signals land on whatever accounts you're signed into in this browser. Sign into YouTube, Reddit, Instagram and X here once, and the changes carry over to their apps.</p>
+</main>
+<script src="personas.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Focus Feed Mobile - Auto Trainer",
+  "version": "1.0.0",
+  "description": "Automatically retrains YouTube, Reddit, Instagram and X on your phone: opens good content in background tabs, watches, likes, closes.",
+  "browser_specific_settings": {
+    "gecko": { "id": "focus-feed-mobile@lada-algo", "strict_min_version": "121.0" },
+    "gecko_android": { "strict_min_version": "121.0" }
+  },
+  "permissions": ["tabs", "storage", "alarms"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.reddit.com/*",
+    "*://*.instagram.com/*",
+    "*://*.x.com/*",
+    "*://*.wikipedia.org/*"
+  ],
+  "background": {
+    "scripts": ["personas.js", "background.js"],
+    "service_worker": "background.js"
+  },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.reddit.com/*",
+        "*://*.instagram.com/*",
+        "*://*.x.com/*",
+        "*://*.wikipedia.org/*"
+      ],
+      "js": ["trainer.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
